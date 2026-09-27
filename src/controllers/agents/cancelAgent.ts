@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { agentRunRepository } from '../../repositories/agentRun.repository';
+import { aiQueue } from '../../queues/aiQueue';
 import { ForbiddenError, NotFoundError, UnauthorizedError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
 import { ok } from '../../utils/formatters';
@@ -17,6 +18,14 @@ export const cancelAgent = async (req: Request, res: Response): Promise<void> =>
     throw new ForbiddenError(Messages.AGENT.NOT_FOUND);
   }
   if (agentRun.status === 'PENDING' || agentRun.status === 'RUNNING') {
+    const metadata = agentRun.metadata as { jobId?: string } | null;
+    if (metadata?.jobId) {
+      try {
+        await aiQueue.remove(metadata.jobId);
+      } catch {
+        // job may already have started or completed — fall through
+      }
+    }
     await agentRunRepository.update(agentRunId, {
       status: 'FAILED',
       errorMessage: 'Cancelled by user',

@@ -5,6 +5,7 @@ export { refreshToken } from './refreshToken';
 export { resetPassword, requestResetPassword } from './resetPassword';
 export { changePassword } from './changePassword';
 export { verifyEmail } from './verifyEmail';
+export { verifyTwoFactor } from './verifyTwoFactor';
 export { resendVerification } from './resendVerification';
 export { oauthCallback } from './oauthCallback';
 export { oauthAuthorize } from './oauthAuthorize';

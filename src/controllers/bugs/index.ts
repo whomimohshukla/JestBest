@@ -7,3 +7,4 @@ export { assignBug } from './assignBug';
 export { addBugComment } from './addBugComment';
 export { listBugComments } from './listBugComments';
 export { listBugs } from './listBugs';
+export { raiseOnGithub } from './raiseOnGithub';

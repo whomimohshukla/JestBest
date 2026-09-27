@@ -16,6 +16,6 @@ export const addSuiteItem = async (req: Request, res: Response): Promise<void> =
   if (req.orgId && project?.organizationId !== req.orgId) {
     throw new ForbiddenError(Messages.AUTH.FORBIDDEN);
   }
-  const updated = await testCaseService.addSuiteItem(testSuiteId, testCaseId, order);
-  res.status(200).json(ok(updated, { message: Messages.TEST.UPDATED }));
+  await testCaseService.addSuiteItem(testSuiteId, testCaseId, order);
+  res.status(200).json(ok(await testCaseService.getApiSuite(testSuiteId), { message: Messages.TEST.UPDATED }));
 };

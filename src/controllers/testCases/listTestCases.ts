@@ -21,7 +21,9 @@ export const listTestCases = async (req: Request, res: Response): Promise<void> 
 
   const result = await testCaseService.list(
     {
-      ...(projectId ? { projectId } : {}),
+      ...(projectId
+        ? { projectId }
+        : { project: { organizationId: req.orgId } }),
       ...(type ? { type: type as never } : {}),
       ...(applicationId ? { applicationId } : {}),
     },

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { NotFoundError } from '../../utils/errors';
+import { NotFoundError, UnauthorizedError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
 import { ok } from '../../utils/formatters';
 import { prisma } from '../../config/database';
@@ -7,7 +7,7 @@ import { auditService } from '../../services/audit/auditTrailService';
 
 export const revokeApiKey = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
-    throw new NotFoundError(Messages.AUTH.UNAUTHORIZED);
+    throw new UnauthorizedError(Messages.AUTH.UNAUTHORIZED);
   }
   const { apiKeyId } = req.params as { apiKeyId: string };
   const apiKey = await prisma.apiKey.updateMany({

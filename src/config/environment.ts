@@ -21,6 +21,7 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  PASSWORD_RESET_EXPIRES_IN: z.string().default('1h'),
   JWT_ISSUER: z.string().default('veribot'),
 
   ENCRYPTION_KEY: z.string().min(32),
@@ -29,6 +30,8 @@ const envSchema = z.object({
   LOG_LEVEL: z.string().default('info'),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(60000),
   RATE_LIMIT_MAX: z.coerce.number().default(100),
+  RATE_LIMIT_AUTH_WINDOW_MS: z.coerce.number().default(15 * 60 * 1000),
+  RATE_LIMIT_AUTH_MAX: z.coerce.number().default(20),
 
   AWS_REGION: z.string().default('us-east-1'),
   AWS_ACCESS_KEY_ID: z.string().optional(),

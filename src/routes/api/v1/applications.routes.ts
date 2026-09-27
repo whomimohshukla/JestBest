@@ -8,6 +8,7 @@ import {
   addEnvironment,
   addTestUser,
   scanApplication,
+  getScanStatus,
   getApplicationMap,
 } from '../../../controllers/applications';
 import { authenticate, tenantMiddleware, validate, requirePermission } from '../../../middleware';
@@ -19,6 +20,7 @@ import {
   addEnvironmentSchema,
   addTestUserSchema,
   scanApplicationSchema,
+  applicationScanParamsSchema,
 } from '../../../validators';
 
 const router = Router();
@@ -82,6 +84,13 @@ router.post(
   validate(applicationParamsSchema, 'params'),
   validate(scanApplicationSchema),
   scanApplication
+);
+// Polls a scan started above. Declared after the POST so the literal paths win.
+router.get(
+  '/:applicationId/scan/:scanId',
+  requirePermission(Permissions.APPLICATION_SCAN),
+  validate(applicationScanParamsSchema, 'params'),
+  getScanStatus
 );
 
 export default router;

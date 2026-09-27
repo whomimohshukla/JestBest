@@ -9,11 +9,12 @@ export const billingWebhook = async (req: Request, res: Response): Promise<void>
   if (!signature) {
     throw new UnauthorizedError(Messages.AUTH.UNAUTHORIZED);
   }
-  const rawBody = Buffer.isBuffer(req.body)
-    ? req.body.toString('utf8')
-    : typeof req.body === 'string'
-      ? req.body
-      : JSON.stringify(req.body ?? {});
+  const rawBody = req.rawBody?.toString('utf8');
+  if (!rawBody) {
+    // Never fall back to re-serializing the parsed body: the signature is
+    // computed over the exact bytes the provider sent.
+    throw new UnauthorizedError(Messages.AUTH.UNAUTHORIZED);
+  }
   const result = await billingService.handleStripeWebhook(signature, rawBody);
   res.status(200).json(ok(result));
 };

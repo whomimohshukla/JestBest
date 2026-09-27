@@ -6,6 +6,15 @@ export const organizationRepository = {
 
   findBySlug: (slug: string) => prisma.organization.findFirst({ where: { slug, deletedAt: null } }),
 
+  /**
+   * Slug availability for creation. `slug` carries a global unique index that also
+   * covers soft-deleted rows, so this must not filter on `deletedAt` — otherwise a
+   * slug belonging to a soft-deleted organization looks free and the insert fails
+   * with a unique-constraint error.
+   */
+  slugExists: async (slug: string): Promise<boolean> =>
+    (await prisma.organization.count({ where: { slug } })) > 0,
+
   create: (data: Prisma.OrganizationCreateInput) => prisma.organization.create({ data }),
 
   update: (id: string, data: Prisma.OrganizationUpdateInput) =>

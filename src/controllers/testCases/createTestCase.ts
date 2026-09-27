@@ -35,9 +35,18 @@ export const createTestCase = async (req: Request, res: Response): Promise<void>
   if (!project || project.organizationId !== req.orgId) {
     throw new ForbiddenError(Messages.PROJECT.NOT_FOUND);
   }
+  const applicationId = body.applicationId || undefined;
+  if (applicationId) {
+    const application = await prisma.application.findUnique({ where: { id: applicationId } });
+    if (!application || application.projectId !== body.projectId) {
+      throw new ForbiddenError(Messages.APPLICATION.NOT_FOUND);
+    }
+  }
   const testCase = await testCaseService.create({
     ...body,
     projectId: body.projectId,
+    applicationId,
+    workflowId: body.workflowId || undefined,
     steps: body.steps as never,
     tags: body.tags ?? [],
   });

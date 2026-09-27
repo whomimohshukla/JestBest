@@ -1,6 +1,7 @@
 import type { Integration } from '@prisma/client';
 import { integrationRepository } from '../../repositories/integration.repository';
-import { NotFoundError, UpstreamError, ConflictError } from '../../utils/errors';
+import { projectRepository } from '../../repositories/project.repository';
+import { NotFoundError, UpstreamError, ConflictError, ForbiddenError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
 import { decrypt, encrypt } from '../../utils/encryption';
 import { getRedis } from '../../config/redis';
@@ -33,6 +34,8 @@ const decryptedConfig = (integration: Integration): IntegrationConfig => {
   return decrypted;
 };
 
+export const integrationConfigOf = decryptedConfig;
+
 const isEncryptedValue = (value: string): boolean => {
   try {
     const buffer = Buffer.from(value, 'base64');
@@ -50,17 +53,30 @@ const isEncryptedValue = (value: string): boolean => {
 
 export const integrationService = {
   async connect(organizationId: string, params: ConnectIntegrationInput): Promise<Integration> {
+    // A project id arrives from the client, so it must be proven to belong to
+    // the caller. Without this an organization could attach its integration to
+    // another tenant's project (the FK alone does not prevent it).
+    if (params.projectId) {
+      const project = await projectRepository.findById(params.projectId);
+      if (!project || project.organizationId !== organizationId) {
+        throw new ForbiddenError(Messages.PROJECT.NOT_FOUND);
+      }
+    }
+
     const existing = await integrationRepository.findByType(organizationId, params.type, params.projectId);
     if (existing) {
       throw new ConflictError('This integration is already connected.');
     }
 
-    const config = encrypt(JSON.stringify(params.config));
+    const config: Record<string, string> = {};
+    for (const [key, value] of Object.entries(params.config ?? {})) {
+      config[key] = encrypt(String(value));
+    }
     const integration = await integrationRepository.create({
       organizationId,
       projectId: params.projectId,
       type: params.type,
-      config: JSON.parse(config) as object,
+      config: config as object,
     });
 
     logger.info({ integrationId: integration.id, type: params.type }, 'integration connected');

@@ -6,4 +6,5 @@ export { deleteApplication } from './deleteApplication';
 export { addEnvironment } from './addEnvironment';
 export { addTestUser } from './addTestUser';
 export { scanApplication } from './scanApplication';
+export { getScanStatus } from './getScanStatus';
 export { getApplicationMap } from './getApplicationMap';

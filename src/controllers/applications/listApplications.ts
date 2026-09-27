@@ -21,5 +21,6 @@ export const listApplications = async (req: Request, res: Response): Promise<voi
     return;
   }
 
-  res.status(200).json(ok([]));
+  const applications = await applicationService.listByOrganization(req.orgId);
+  res.status(200).json(ok(applications));
 };
