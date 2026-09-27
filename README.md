@@ -1,823 +1,408 @@
-# VeriBot 🤖
+# VeriBot
 
-VeriBot is an AI-powered QA SaaS platform that autonomously explores web applications, generates tests, runs them in a browser, analyzes failures, detects bugs, and helps engineers fix issues with AI-assisted workflows.
+VeriBot is an AI-powered QA platform. Point it at a web application and it crawls
+the app, generates test cases, executes them in a real browser (Playwright),
+analyses failures, files bugs, and reports quality trends.
 
-**Main purpose:** turn an untested web app into a continuously verified, regression-safe product. VeriBot discovers your app's pages and flows, generates and executes E2E tests in a real browser, hunts down flaky and failing behavior with AI root-cause analysis + a self-accumulating vector knowledge base, files bugs (optionally straight into GitHub), and reports quality trends so a small team gets enterprise-grade QA with no manual test writing.
+**The product idea:** turn an untested web app into a continuously verified,
+regression-safe product. VeriBot discovers pages and flows, generates and runs E2E
+tests, hunts flaky behaviour with AI root-cause analysis backed by a self-accumulating
+pgvector knowledge base, and files bugs into GitHub/Jira.
 
-This project is designed as a strong portfolio-grade SaaS product and a serious real-world engineering challenge. It combines full-stack development, browser automation, AI agents, DevOps, and production architecture.
+---
 
-## 🚀 Quick Start
+## Table of contents
 
-### Prerequisites
-- Node.js 18+
-- Docker & Docker Compose
-- PostgreSQL (via Docker)
-- Redis (via Docker)
+- [Requirements](#requirements)
+- [Quick start](#quick-start)
+- [Running without Docker](#running-without-docker)
+- [Environment variables](#environment-variables)
+- [Architecture](#architecture)
+- [Request lifecycle](#request-lifecycle)
+- [Project layout](#project-layout)
+- [Multi-tenancy and authorization](#multi-tenancy-and-authorization)
+- [Background jobs](#background-jobs)
+- [Testing](#testing)
+- [Common tasks](#common-tasks)
+- [Deployment](#deployment)
+- [Implementation status](#implementation-status)
 
-### Start Development Environment
+---
+
+## Requirements
+
+| Tool | Version | Notes |
+| --- | --- | --- |
+| Node.js | **>= 20.0.0** | enforced by `engines` in `package.json` |
+| PostgreSQL | 14+ | must have the **pgvector** extension available |
+| Redis | 6+ | used for BullMQ, caching, and rate limiting |
+| Docker | optional | only used to run Postgres/Redis locally |
+| Playwright browsers | optional | `npx playwright install chromium` |
+
+The API is a single Node package; the frontend lives in `web/` and has its own
+`package.json`.
+
+## Quick start
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd VeriBot
-
-# Install dependencies
+# 1. Install dependencies (backend + frontend)
 npm install
-cd web && npm install && cd ..
+npm install --prefix web
 
-# Start Docker services (PostgreSQL & Redis)
+# 2. Start Postgres + Redis
 docker compose up -d postgres redis
 
-# Run database migrations
+# 3. Configure the environment
+cp .env.example .env       # then edit it — see "Environment variables"
+
+# 4. Create the database schema
+npm run prisma:deploy      # applies existing migrations
+# or, to create a new migration from schema changes:
 npm run prisma:migrate
 
-# Start both backend and frontend
+# 5. Seed roles/permissions (optional but recommended)
+npm run prisma:seed
+
+# 6. Start both dev servers
 ./start-dev.sh
 ```
 
-**Backend API:** `http://localhost:4000`  
-**Frontend App:** `http://localhost:5173`
+- API: <http://localhost:4000/api/v1>
+- Health check: <http://localhost:4000/api/v1/health>
+- Frontend: <http://localhost:5173>
 
-Or start them separately:
+Prefer separate terminals?
 
 ```bash
-# Terminal 1 - Backend
-npm run dev
-
-# Terminal 2 - Frontend
-cd web && npm run dev
+npm run dev                        # terminal 1 — API + workers, watches files
+npm run dev --prefix web           # terminal 2 — Vite dev server
 ```
 
-## ✅ Project Status
+The frontend dev server proxies `/api` to the backend, so no CORS configuration
+is needed for local development.
 
-### **Backend: 90% Complete** 🟢
-- ✅ Authentication (JWT, OAuth GitHub)
-- ✅ User & Organization Management
-- ✅ Projects & Applications
-- ✅ Test Cases & Test Runs
-- ✅ Bug Management
-- ✅ AI-Powered Features (Test Gen, Analysis, Fix Suggestions)
-- ✅ Integrations (GitHub, Jira, Slack)
-- ✅ Email Notifications (SendGrid)
-- ✅ Billing & Subscriptions (Stripe)
-- ✅ Analytics & Reporting
-- ✅ Browser Automation (Playwright)
-- ✅ Workflow Discovery
-- ✅ Flaky Test Detection
-- ✅ Release Risk Scoring
+## Running without Docker
 
-### **Frontend: 100% Complete** 🎉
-- ✅ Modern React 18 + TypeScript
-- ✅ Dark Theme with Purple Accent
-- ✅ Authentication Pages (Login/Register)
-- ✅ Dashboard with Charts & Analytics
-- ✅ Projects Management
-- ✅ Test Runs Viewer
-- ✅ Bug Tracker
-- ✅ Responsive Design (Mobile/Tablet/Desktop)
-- ✅ Animations & Loading States
-- ✅ Toast Notifications
-- ✅ API Integration with React Query
-- ✅ State Management (Zustand)
-- ✅ Production Build Ready
+`start-dev.sh` requires a running Docker daemon. If you have Postgres and Redis
+installed natively, skip it and run the two dev servers directly.
 
-**See:** [FRONTEND_IMPLEMENTATION_COMPLETE.md](./FRONTEND_IMPLEMENTATION_COMPLETE.md)
+The API needs a `veribot_test` database in addition to `veribot` before you can
+run the test suite:
 
-## Why this project is strong
-
-This project demonstrates a complete product stack:
-
-- **Frontend:** React 18, TypeScript, Tailwind CSS, Vite
-- **Backend:** Node.js, Express, TypeScript
-- **Database:** PostgreSQL + Prisma
-- **Queues:** Redis + BullMQ
-- **Browser automation:** Playwright
-- **AI:** LLMs, agents, tool calling, RAG, pgvector
-- **Integrations:** GitHub, Jira, Slack
-- **Infrastructure:** Docker, Kubernetes, Terraform, AWS
-- **SaaS features:** Authentication, organizations, RBAC, billing, analytics
-
-This is not just a chatbot or a toy demo. It is a production-style AI QA platform.
-
----
-
-## Product vision
-
-The customer provides:
-
-- website URL
-- test credentials
-- optional GitHub repository
-- optional requirements
-
-The system then:
-
-1. explores the app automatically
-2. maps pages, flows, and actions
-3. creates AI-generated test cases
-4. runs them using Playwright
-5. captures screenshots, logs, and network traces
-6. analyzes failures with AI
-7. detects bugs and root causes
-8. creates GitHub issues or work items
-9. suggests or applies code fixes
-10. validates the fix with regression testing
-11. produces a quality dashboard and release risk score
-
----
-
-## Problem it solves
-
-Most QA teams still rely on repetitive manual testing and brittle scripts. This product aims to reduce that burden by using AI to:
-
-- discover app flows automatically
-- produce regression tests faster
-- explain failures better
-- surface root-cause analysis
-- reduce time-to-fix for engineering teams
-
----
-
-## Core user journey
-
-```text
-User signs up
-  ↓
-Creates an organization
-  ↓
-Creates a project
-  ↓
-Adds application URL
-  ↓
-Adds test credentials
-  ↓
-AI explorer scans the app
-  ↓
-App map is generated
-  ↓
-AI generates tests
-  ↓
-Playwright executes tests
-  ↓
-Results, screenshots, logs, and bug reports are created
-  ↓
-AI analyzes failures and suggests fixes
-  ↓
-Engineer reviews and approves
-  ↓
-Regression validation and dashboard reporting
+```bash
+createdb veribot
+createdb veribot_test
 ```
 
----
+Then set `DATABASE_URL` for the app and `TEST_DATABASE_URL` for Jest. Without
+`TEST_DATABASE_URL`, the integration suites fall back to appending
+`_test` to the database name.
 
-## Complete product flow structure
+## Environment variables
 
-This is the end-to-end flow as actually implemented in the codebase — every step below is backed by a live API route and UI screen.
+Configuration is validated at boot by a Zod schema in
+[`src/config/environment.ts`](src/config/environment.ts) — the process **refuses to
+start** if a required variable is missing, so a typo fails loudly instead of at
+3am. Start from [`.env.example`](.env.example).
 
-```text
-1.  Sign up / sign in
-      └─ Auth: register + email verification gate, JWT access + refresh tokens,
-          optional 2FA, role-based permissions, organization membership
+### Required
 
-2.  Set up organization + project
-      └─ Projects page → create project + add app (URL, environment, auth hints)
+| Variable | Purpose |
+| --- | --- |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | signing secrets for the two token types |
+| `ENCRYPTION_KEY` | key used to encrypt integration config and test credentials at rest |
+| `APP_ORIGIN` / `FRONTEND_ORIGIN` | public URLs, used for links and CORS |
 
-3.  Add infrastructure & integrations
-      └─ Applications, test credentials, environments, test suites
-      └─ Integrations: GitHub (report bugs automatically), Jira, Slack,
-          Sentry, CircleCI (config is encrypted at rest)
+### Usually required in production
 
-4.  AI app discovery (OPTIONAL)
-      └─ Explorer agent crawls the app URL → app map + suggested workflows
+`CORS_ORIGINS` (comma-separated allowlist), `SENDGRID_API_KEY` + `EMAIL_FROM`
+(outbound email), `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (billing),
+`AWS_*` (S3 uploads for screenshots/videos), `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`
+(OAuth), and the `OPENAI_*` / `GEMINI_API_KEY` / `HUGGINGFACE_API_KEY` triplet.
 
-5.  Test authoring
-      └─ Hand-written test cases (steps as JSON) or AI-generated via
-          the test-generation agent → saved to a test suite
+### Development conveniences
 
-6.  Run tests
-      └─ Runs are queued (BullMQ) and executed in a real browser (Playwright)
-      └─ Runs record pass/fail/skip per case, duration, screenshots, console
-          logs, network + DOM snapshots, and triggerType metadata
-          (MANUAL / SCHEDULED / API / CI)
+- **`AI_PROVIDER=mock`** returns deterministic canned LLM responses. Everything
+  works end-to-end without any API key — this is the default in `.env.example`.
+- **`EMAIL_PROVIDER=log`** prints emails to stdout instead of sending them, so
+  you can click verification links straight from the terminal.
+- **`REQUIRE_EMAIL_VERIFICATION=false`** skips the verification gate locally.
+  Leave it `true` everywhere else.
 
-7.  Analyze failures (AI, optional)
-      └─ Failure analyzer agent (LangGraph-style state-graph orchestrator)
-          produces root cause, category, confidence, suggested fix
-      └─ pgvector RAG: enriched with historically similar past failures;
-          every finished analysis is stored back in the vector knowledge base
+### Rate limiting
 
-8.  Bug management
-      └─ Bugs are created from failing runs (auto) or manually
-      └─ Bug lifecycle: severity / priority / assignee / comments / status
-      └─ GitHub integration: bug is auto-mirrored as a GitHub issue, or
-          pushed on demand via "Report on GitHub" (idempotent, keeps issue URL)
+| Variable | Default | Applies to |
+| --- | --- | --- |
+| `RATE_LIMIT_WINDOW_MS` | `60000` | general API limiter |
+| `RATE_LIMIT_MAX` | `100` | general API limiter |
+| `RATE_LIMIT_AUTH_WINDOW_MS` | `900000` (15 min) | auth routes |
+| `RATE_LIMIT_AUTH_MAX` | `20` | auth routes |
 
-9.  Flaky detection + healing (AI, optional)
-      └─ Flaky test records detect flakiness scores over repeated runs
-      └─ Healing agent proposes repaired selectors for flaky locators
-
-10. Review, approve, report
-      └─ Quality dashboard: pass rate, trends, flaky/failing hotspots
-      └─ Analytics & reports; run replay and CI results (CircleCI)
-
-11. Secure platform loops
-      └─ Billing (Stripe plans), rate limiting, audit/notifications
-      └─ Scheduled + CI/CD-triggered runs keep regression coverage continuous
-```
-
-### Request lifecycle (backend)
+## Architecture
 
 ```text
- HTTP request
-   → CORS + security headers
-   → rate limiter
-   → JWT authenticate + tenant middleware (resolves org + permissions)
-   → route-level validator (Zod)
-   → controller (business rules + permissions check)
-   → service layer (AI agents, test runner, billing, GitHub, etc.)
-   → repository / Prisma
-   → PostgreSQL (+ pgvector) / Redis / BullMQ queues / worker pool
-
- Background workers
-   → run-test jobs execute in Playwright
-   → failure-analysis jobs run the agent graph
-   → notification + billing jobs update state asynchronously
-```
-
----
-
-## High-level system design
-
-```text
-                          USER
-                            │
-                            ▼
-                   ┌─────────────────┐
-                   │   Next.js Web   │
-                   │   Dashboard     │
-                   └────────┬────────┘
-                            │
-                            ▼
-                   ┌─────────────────┐
-                   │  Express API    │
-                   │  Node.js + TS   │
-                   └───────┬─────────┘
-                           │
-        ┌──────────────────┼──────────────────────┐
-        │                  │                      │
-        ▼                  ▼                      ▼
-   Auth Service      Project Service        AI Service
-        │                  │                      │
-        │                  │             ┌────────┴────────┐
-        │                  │             │   AI Agents     │
-        │                  │             │   Explorer      │
-        │                  │             │   Test Gen      │
-        │                  │             │   Analyzer      │
-        │                  │             │   Fix Agent     │
-        │                  │             └────────┬────────┘
-        │                  │                      │
-        └──────────────────┼──────────────────────┘
-                           │
+                        Browser
+                          │
+                          ▼
+                 ┌────────────────────┐
+                 │  React SPA (Vite)  │  web/
+                 │  React Query +     │
+                 │  Zustand + RHF    │
+                 └─────────┬──────────┘
+                           │  /api  (proxied in dev)
                            ▼
-                    ┌──────────────┐
-                    │ Redis + BullMQ │
-                    └──────┬───────┘
+                 ┌────────────────────┐
+                 │    Express 5 API   │  src/app.ts
+                 │  helmet · cors ·   │
+                 │  rate limit · pino │
+                 └─────────┬──────────┘
                            │
-     ┌─────────────────────┼─────────────────────┐
-     ▼                     ▼                     ▼
- AI Worker           Test Worker          Report Worker
-     │                     │                     │
-     ▼                     ▼                     ▼
-LLM Tools            Playwright          Quality Reports
-                     Browser            GitHub/Jira/Slack
-
-                           │
-                           ▼
-                    PostgreSQL + Prisma
-                           │
-                    pgvector + Redis
-                           │
-                           ▼
-                    S3 / object storage
+        ┌──────────────────┼───────────────────┐
+        ▼                  ▼                   ▼
+   middleware          services            repositories
+  authenticate        (business logic)      (Prisma)
+  tenantMiddleware         │                   │
+  requirePermission        │                   │
+  validate (Zod)          ▼                   │
+                    AI agents · test        PostgreSQL + pgvector
+                    runner · billing                │
+                    GitHub/Jira/Slack         ┌────┴─────┐
+                           │              Redis (queues)
+                           ▼              + cache
+                    BullMQ queues ──► workers (Playwright, analysis)
 ```
 
----
+Three layers, strictly one-directional:
 
-## Effective project structure
+- **routes** declare the URL, the permission it requires, and which Zod schema
+  validates each input.
+- **controllers** own request/response translation only.
+- **services** hold all business rules and are the only layer that coordinates
+  other services.
+- **repositories** wrap Prisma. Business logic should not import Prisma directly.
 
-The repo is a single Node package with the frontend under `web/`. The diagram below shows the layout it most closely resembles.
+## Request lifecycle
+
+```text
+HTTP request
+  → helmet security headers
+  → CORS
+  → rate limiter            (express-rate-limit)
+  → pino-http request log
+  → authenticate()          JWT access token, or x-api-key + x-org-id
+  → tenantMiddleware()      resolves the active organization → req.orgId
+  → requirePermission()     RBAC check against the caller's role
+  → validate(schema, ...)   Zod: body / query / params
+  → controller
+  → service
+  → repository → Prisma → PostgreSQL
+```
+
+The API exposes **110 endpoints** across 16 routers:
+
+| Prefix | Responsibility |
+| --- | --- |
+| `/auth` | register, verify email, login, 2FA, refresh, logout, OAuth |
+| `/users` | profile, password change, user management |
+| `/organizations` | orgs, members, invitations, roles, audit logs |
+| `/projects` | projects, archive, dashboard |
+| `/applications` | target applications, environments, test users |
+| `/test-cases` | CRUD, duplicate, archive, AI generation |
+| `/test-suites` | suites and suite membership |
+| `/test-runs` | enqueue runs, results, logs, screenshots |
+| `/bugs` | CRUD, status, assignee, comments, GitHub reporting |
+| `/agents` | AI agent runs and traces |
+| `/integrations` | GitHub, Jira, Slack, Sentry, CircleCI config |
+| `/webhooks` | outbound webhook registration and deliveries |
+| `/analytics` | quality metrics, trends, reports |
+| `/api-keys` | API key issue/list/revoke |
+| `/billing` | plans, subscription, usage, Stripe webhook |
+| `/health` | liveness and readiness |
+
+## Project layout
 
 ```text
 VeriBot/
 ├── prisma/
-│   ├── schema.prisma
-│   └── migrations/
+│   ├── schema.prisma          39 models
+│   └── migrations/            6 migrations
 ├── src/
-│   │   └── types/
-│   │
-├── src/
-│   ├── controllers/
-│   ├── routes/
-│   ├── services/
-│   ├── middleware/
-│   ├── validators/
-│   ├── workers/
-│   ├── config/
-│   └── server.ts
-├── web/            # React + TypeScript frontend
-│   └── src/
-│       ├── pages/
-│       ├── components/
-│       ├── hooks/
-│       └── lib/
-├── docs/           # design docs & guides
-├── docker-compose.yml
-├── package.json
-├── tsconfig.json
-├── README.md
-└── .gitignore
+│   ├── app.ts                 createApp(): the Express app, no side effects
+│   ├── server.ts              listener, worker boot, graceful shutdown
+│   ├── config/                env, db, redis, queue, aws, logger
+│   ├── constants/             messages, permissions, roles
+│   ├── controllers/           HTTP translation only
+│   ├── routes/api/v1/         routers + permission middleware
+│   ├── services/              business logic
+│   │   ├── ai/                provider abstraction + agents
+│   │   ├── analytics/  auth/  billing/  bug/  cache/
+│   │   ├── integration/       GitHub, Jira, Slack, Sentry, CircleCI
+│   │   └── test/              test case + run orchestration
+│   ├── repositories/          Prisma data access
+│   ├── jobs/                  job handlers
+│   ├── queues/                BullMQ queue definitions
+│   ├── workers/               worker bootstrap
+│   ├── middleware/            auth, tenant, rbac, validation, errors
+│   ├── validators/            Zod schemas
+│   ├── utils/                 errors, formatters, helpers
+│   └── types/
+├── __tests__/
+│   ├── unit/                  no I/O
+│   ├── integration/           real Postgres + Redis, via supertest
+│   ├── fixtures/              app + user factories, DB reset
+│   ├── rbac.test.ts
+│   └── validation.test.ts
+├── web/src/
+│   ├── api/                   typed axios clients
+│   ├── pages/                 one directory per feature area
+│   ├── components/  hooks/  store/  lib/
+└── docker-compose.yml
 ```
 
----
+### `app.ts` vs `server.ts`
 
-## How the current repo maps to the product
+`src/app.ts` exports `createApp()`, which builds the Express app and **starts
+nothing** — no port binding, no workers, no connections. `src/server.ts` imports
+it, boots the workers, and listens. This split is what makes the integration
+tests possible: they mount the same app the server mounts, without fighting over
+port 4000.
 
-The repo uses a single-package layout with a separate frontend under `web/`:
+## Multi-tenancy and authorization
 
-- `src/` → backend API/service layer, queued workers, AI agents, Prisma schema
-- `web/` → React + TypeScript frontend (Vite, React Router, React Query)
-- `prisma/` → Prisma schema and migrations (PostgreSQL + pgvector)
-- `src/workers/` → BullMQ/Redis background processing (test runs, agent runs, reports, scheduled runs)
+Every request is scoped to exactly one organization, resolved by
+`tenantMiddleware` into `req.orgId`. There are three ways to authenticate:
 
----
+1. **JWT access token** in `Authorization: Bearer …`. The token carries the
+   caller's role for the active org; `x-org-id` overrides which of your orgs is
+   active, and is rejected if you are not a member.
+2. **API key** via `x-api-key: vrb_…` **plus** `x-org-id`. Keys are stored as
+   SHA-256 hashes and only ever displayed once, at creation.
+3. **Optional auth** for public endpoints that behave differently when signed in.
 
-## Core platform modules
+Roles are `OWNER`, `ADMIN`, `QA_MANAGER`, `DEVELOPER`, `TESTER`, `VIEWER`, mapped
+to granular permissions in [`src/constants/permissions.ts`](src/constants/permissions.ts).
 
-### 1. Authentication and authorization
+> **Path parameters are not authorization.** A route like
+> `PATCH /organizations/:organizationId` authorizes against the caller's org,
+> but the *target* org comes from the URL. Every organization controller
+> therefore re-checks membership against `:organizationId` via
+> `assertMembership` before acting. The same applies to any resource that carries
+> an `organizationId`: a controller must confirm it belongs to `req.orgId`
+> instead of trusting a foreign id that passed validation.
+> [`__tests__/integration/organizations/tenancy.test.ts`](__tests__/integration/organizations/tenancy.test.ts)
+> is the regression guard for this.
 
-- user signup/login
-- organization management
-- team and RBAC
-- project permissions
-- API keys
-- OAuth integrations
+## Background jobs
 
-### 2. Project and application management
+Long-running work never happens inside a request. The API enqueues and returns.
 
-- create project
-- add website URLs
-- add environments
-- store test credentials securely
-- track app metadata
+| Queue | Handler | Work |
+| --- | --- | --- |
+| `testQueue` | `testExecution` | run test cases in Playwright, store results/evidence |
+| `aiQueue` | `aiExploration`, `failureAnalysis` | crawl the app; root-cause a failure; cost tracking |
+| `reportQueue` | `reportGeneration` | quality reports |
+| `webhookQueue` | `webhookDelivery` | signed outbound webhook calls with retries |
 
-### 3. AI app explorer
+Queue names are namespaced per `NODE_ENV` (see `src/config/queue.ts`), so a test
+run never shares BullMQ state with a dev server running alongside it.
 
-- discover pages
-- understand flows
-- map user journeys
-- inspect DOM structure
-- detect forms, buttons, tables, and modals
+## Testing
 
-### 4. Test generation
+```bash
+npm test              # everything, serially
+npm run test:unit     # fast: no Postgres or Redis needed
+npm run test:integration
+npm run typecheck
+npm run lint
+```
 
-- generate smoke tests
-- happy-path tests
-- negative tests
-- edge-case tests
-- regression tests
+The integration suites drive the real Express app with
+[supertest](https://github.com/ladjs/supertest) against a **real** Postgres and
+Redis — no mocked Prisma. That is deliberate: tenancy bugs, transaction
+behaviour, and Prisma query mistakes are precisely what a mocked database hides.
 
-### 5. Browser runner
+Each integration file truncates `veribot_test` in `beforeEach`, so **the suites
+must run serially** — which is why `npm test` passes `--runInBand`. Running
+`npx jest` directly without that flag will produce flaky failures.
 
-- launch browser contexts
-- automate actions
-- handle login flows
-- capture evidence
-- support desktop/mobile breakpoints
+`__tests__/fixtures/testApp.ts` provides `request()`, `createTestUser()`, and
+`resetDatabase()`, and closes queues/Redis on teardown so Jest can exit.
 
-### 6. Failure analysis
+Current state: **174 tests across 11 suites, all passing.**
 
-- collect screenshots and logs
-- analyze DOM / console / network data
-- root-cause analysis with LLM
-- severity and confidence scoring
+| Suite | What it covers |
+| --- | --- |
+| `unit/utils`, `unit/validators` | slug resolution, pagination, JWT, Zod schemas |
+| `rbac`, `validation` | permission matrix, validator edge cases |
+| `integration/auth` | register → verify → login → refresh → `/users/me`, password change |
+| `integration/organizations` | cross-tenant isolation, membership, role changes |
+| `integration/projects` | CRUD, pagination, archiving, dashboard |
+| `integration/testCases` | CRUD, duplicate, archive, filters, generation |
+| `integration/bugs` | CRUD, status, assignment, comments, filters |
+| `integration/apiKeys` | issue/revoke, hash never exposed, API-key auth |
 
-### 7. Bug management
+## Common tasks
 
-- create issues from failures
-- sync with GitHub/Jira/Slack
-- open bug records with evidence
-- assign issues to users
+```bash
+npm run dev                 # API + workers with reload
+npm run build               # compile to dist/
+npm start                   # run the compiled server
+npm run typecheck           # tsc --noEmit
+npm run lint                # eslint
+npm run format              # prettier --write
 
-### 8. AI fix agent
+npm run prisma:generate     # regenerate the client after schema edits
+npm run prisma:migrate      # create + apply a migration
+npm run prisma:deploy       # apply migrations only (CI/production)
+npm run prisma:seed         # seed roles and permissions
 
-- explore repository
-- locate relevant code
-- create patch suggestions
-- validate via tests
-- create PR draft
+npm run dev --prefix web    # frontend
+npm run build --prefix web  # typecheck + production build
+npm run lint --prefix web
+```
 
-### 9. Quality dashboard
+Playwright needs its browser binaries once:
 
-- pass/fail trends
-- execution history
-- flaky test analysis
-- performance and accessibility metrics
-- release risk insights
+```bash
+npx playwright install chromium
+```
 
----
+## Deployment
 
-## Data model
-
-Core entities should include:
-
-- User
-- Organization
-- Team and Role
-- Project
-- Application
-- Environment
-- TestUser
-- TestCase
-- TestSuite
-- TestRun
-- TestResult
-- Screenshot
-- Video
-- Bug
-- BugComment
-- Attachment
-- AgentRun
-- AITrace
-- Integration
-- Webhook
-- Subscription
-- Usage
-- AuditLog
-
----
-
-## Recommended stack
-
-### Frontend
-
-- Next.js
-- TypeScript
-- Tailwind CSS
-- shadcn/ui or similar
-
-### Backend
-
-- Node.js
-- Express
-- TypeScript
-- Zod validation
-- JWT/session auth
-
-### Data layer
-
-- PostgreSQL
-- Prisma
-- Redis
-- pgvector
-
-### Automation
-
-- Playwright
-- Browser contexts
-- screenshots and traces
-
-### AI layer
-
-- OpenAI or other LLM provider
-- LangGraph.js for agents
-- embeddings and vector search
-- tool calling and structured outputs
-
-### DevOps
-
-- Docker
-- GitHub Actions
-- AWS
-- Terraform
-- Kubernetes later
-- Prometheus + Grafana + OpenTelemetry
-
----
-
-## Deployment strategy
-
-This should not be deployed as one giant app unless the project is intentionally built as a single bundle.
-
-For a monorepo like this, the best architecture is:
-
-### Frontend
-
-- deploy the web app on Vercel or Netlify
-
-### API backend
-
-- deploy the Express API on Railway, Render, AWS ECS, or EC2
-
-### Worker services
-
-- deploy the worker on Railway, AWS ECS, or a separate VM/container
-
-### Database
-
-- deploy PostgreSQL externally using Supabase, Neon, Railway Postgres, or AWS RDS
-
-### Queue and caching
-
-- Redis on Upstash, Redis Cloud, or managed Redis service
-
-### Storage
-
-- object storage like S3 for screenshots, videos, and attachments
-
-### Production pattern
+Split the three workloads — they have very different resource profiles:
 
 ```text
-Browser users -> Web app -> API -> PostgreSQL/Redis
-                                  -> Worker -> Playwright
-                                  -> AI services
-                                  -> S3 storage
+Browser → static web build (Vercel/Netlify/S3+CDN)
+        → API        (stateless; horizontal scaling)
+        → Worker     (Playwright; CPU/RAM heavy, scales on queue depth)
+        → PostgreSQL (managed: RDS/Neon/Supabase)
+        → Redis      (managed: ElastiCache/Upstash)
+        → S3         (screenshots, videos, attachments)
 ```
 
-This is the recommended production deployment model for this repo.
-
----
-
-## Roadmap
-
-> Status (2026-09-25): Phases 1-4 of the roadmap below are **implemented** end-to-end (auth, orgs, projects/apps, test cases/suites/runs, Playwright execution, AI test generation/failure analysis with Gemini/HuggingFace/mock providers, bug detection, GitHub issue mirroring, webhooks, scheduling). Phase 5 (AI fix flow) and Phase 6 (enterprise quality features) are partially implemented (flaky-tests detection, release-risk scoring, embeddings) with the remaining checklist items below still open.
-
-## Phase 1: Foundation and MVP
-
-- [x] create backend + frontend structure
-- [ ] set up shared TypeScript config
-- [ ] configure pnpm workspace
-- [ ] build core API and health checks
-- [ ] configure PostgreSQL and Prisma
-- [ ] define core domain models
-- [ ] implement auth and user management
-- [ ] implement organizations and RBAC
-- [ ] create project and application entities
-- [ ] build dashboard shell for web app
-
-## Phase 2: Browser automation and app discovery
-
-- [ ] integrate Playwright
-- [ ] build browser automation runner
-- [ ] open URL and interact with page
-- [ ] record page structure and actions
-- [ ] generate application map
-- [ ] capture screenshots and logs
-- [ ] store test evidence
-
-## Phase 3: AI test generation and execution
-
-- [ ] connect LLM provider
-- [ ] generate test cases from app map and requirements
-- [ ] validate structured outputs with Zod
-- [ ] queue test runs with BullMQ
-- [ ] run tests in worker
-- [ ] collect pass/fail results
-- [ ] display results in dashboard
-
-## Phase 4: Failure analysis and bug detection
-
-- [ ] analyze console logs and DOM state
-- [ ] summarize root causes with AI
-- [ ] classify bug severity
-- [ ] create bug records
-- [ ] attach evidence and screenshots
-- [ ] connect GitHub issue creation
-
-## Phase 5: AI fix flow
-
-- [ ] connect repository data
-- [ ] index repos for semantic search
-- [ ] locate candidate fix locations
-- [ ] generate code patch suggestions
-- [ ] validate through test execution
-- [ ] create PR workflow draft
-- [ ] require human approval for risky actions
-
-## Phase 6: Enterprise quality features
-
-- [ ] flaky test detection
-- [ ] regression suite selection
-- [ ] coverage overview
-- [ ] accessibility checks
-- [ ] API testing support
-- [ ] performance monitoring
-- [ ] security scanning basic checks
-
-## Phase 7: SaaS production readiness
-
-- [ ] billing and subscription logic
-- [ ] usage tracking and quotas
-- [ ] webhooks
-- [ ] Slack and Jira integrations
-- [ ] monitoring and metrics
-- [ ] audit logs and security policies
-- [ ] deployment automation
-
-## Phase 8: Cloud and platform scale
-
-- [ ] Dockerize services
-- [ ] CI/CD via GitHub Actions
-- [ ] deploy to staging and production
-- [ ] add Terraform for infrastructure
-- [ ] add Kubernetes later for scale
-- [ ] implement OpenTelemetry and Grafana
-
----
-
-## Recommended implementation order
-
-The best path is not to build everything at once.
-
-### Step 1: build the foundation
-
-- auth
-- orgs
-- projects
-- apps
-- database models
-- API scaffolding
-
-### Step 2: build the browser automation base
-
-- Playwright integration
-- run a simple page automation script
-- collect evidence
-
-### Step 3: add AI analysis
-
-- generate test cases
-- analyze failures
-- convert failure to bug
-
-### Step 4: build the worker system
-
-- queue management
-- async jobs
-- retries and job state tracking
-
-### Step 5: add GitHub and code fix flow
-
-- repo access
-- code search
-- patch generation
-- PR workflow
-
-### Step 6: add production polish
-
-- dashboards
-- monitoring
-- billing
-- deployment
-- scaling
-
-This staged order is what makes the project achievable.
-
----
-
-## Project checklist
-
-### Foundation
-
-- [ ] monorepo architecture is created
-- [ ] root workspace config is working
-- [ ] API app is booting
-- [ ] web app is booting
-- [ ] worker app is booting
-- [ ] Prisma schema is defined
-- [ ] database connection works
-- [ ] environment variables are configured
-
-### Authentication
-
-- [ ] sign up flow
-- [ ] login flow
-- [ ] session handling
-- [ ] password hashing
-- [ ] organizations
-- [ ] permissions and roles
-
-### Product features
-
-- [ ] project creation
-- [ ] app creation
-- [ ] website URL tracking
-- [ ] test user management
-- [ ] app exploration
-- [ ] page discovery
-- [ ] test generation
-- [ ] test execution
-- [ ] evidence capture
-- [ ] failure analysis
-- [ ] bug creation
-
-### AI features
-
-- [ ] LLM integration
-- [ ] structured generation schema
-- [ ] tool calling system
-- [ ] result evaluation
-- [ ] fix suggestion workflow
-- [ ] human approval gate
-
-### Integrations
-
-- [ ] GitHub auth and repo sync
-- [ ] Jira integration
-- [ ] Slack notifications
-- [ ] webhooks
-
-### Production
-
-- [ ] Docker setup
-- [ ] CI/CD pipeline
-- [ ] staging environment
-- [ ] production environment
-- [ ] monitoring and logs
-- [ ] alerting
-- [ ] cost tracking
-
----
-
-## Recommended final naming
-
-The repo name is already VeriBot, and it fits the product well.
-
-A good project identity would be:
-
-- VeriBot
-- VeriQA
-- QAutonomous
-- AutonomIQ
-- BuildVerify
-- CheckPilot
-
-For this project, VeriBot is the strongest and simplest name because it is memorable and aligned with the concept of automated verification.
-
----
-
-## Final recommendation
-
-This is a very good project to build because it combines:
-
-- SaaS product thinking
-- monorepo architecture
-- backend service design
-- AI engineering
-- browser automation
-- deployment and infra
-
-It is ambitious, but it is exactly the kind of project that is portfolio-worthy if built in phases.
-
-The key is to avoid starting with Kubernetes and multi-agent complexity. Start with:
-
-- auth
-- projects
-- app input
-- Playwright exploration
-- AI-generated tests
-- result dashboard
-
-Then add agent workflows, GitHub integration, worker queues, and production deployment.
-
----
-
-## Best first milestone
-
-The best first milestone is:
-
-```text
-User signs up
-  ↓
-creates a project
-  ↓
-adds a website URL
-  ↓
-AI or Playwright explores the site
-  ↓
-collects discovered pages
-  ↓
-shows them in a dashboard
-```
-
-That is the first real product milestone and the foundation for everything else.
-
----
-
-## The product story for your portfolio
-
-A recruiter or hiring manager should read your project story as:
-
-> Built a full-stack AI QA SaaS platform that automatically explores web applications, generates tests, executes them with Playwright, analyzes failures, detects bugs, and supports AI-assisted remediation workflows.
-
-That is a much stronger portfolio story than a simple AI demo.
-# VeriBot
+`Dockerfile` and `docker-compose.yml` cover the API and its dependencies. The API
+is stateless apart from Postgres/Redis, so it scales horizontally; run the
+workers as a separate process (`src/workers/index.ts`) so browser automation
+never competes with request handling.
+
+Before production: set `REQUIRE_EMAIL_VERIFICATION=true`, replace every secret,
+set an explicit `CORS_ORIGINS` allowlist, and configure real S3 and Stripe keys.
+
+## Implementation status
+
+**Implemented and exercised by tests:** auth (email verification gate, JWT access
++ refresh, 2FA, GitHub OAuth), organizations/members/RBAC, API keys, projects,
+applications, test cases, test suites, test runs, bugs, analytics, integrations,
+webhooks, billing + Stripe webhook, audit logs, notifications, AI test
+generation, and failure analysis.
+
+**Implemented but only partially verified:** Playwright browser execution, GitHub
+issue mirroring, Jira/Slack delivery, and the pgvector knowledge base. These need
+real credentials and a real target site, so they are exercised by the development
+smoke flow rather than by the automated suite.
+
+**Not implemented:** the AI fix agent's end-to-end PR workflow and any genuine
+deployment pipeline (Terraform/Kubernetes/GitHub Actions). Integration config is
+encrypted and stored, but no outbound code-hosting automation runs in production.
