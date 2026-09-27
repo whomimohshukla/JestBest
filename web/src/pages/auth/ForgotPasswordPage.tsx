@@ -4,23 +4,36 @@ import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { Bot, Mail, ArrowRight, Sparkles, CheckCircle2, Loader2 } from 'lucide-react';
+import { Bot, Mail, ArrowRight, Sparkles, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+    toast.dismiss();
+    setError(null);
+    if (!email.trim()) {
+      setError('Please enter your email address.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError('Please enter a valid email address.');
+      return;
+    }
 
+    setIsLoading(true);
     try {
-      await authApi.requestPasswordReset(email);
-      toast.success('Password reset email sent');
+      await authApi.requestPasswordReset(email.trim());
+      toast.success('If that account exists, a reset link has been sent.');
       setSubmitted(true);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -73,15 +86,28 @@ export default function ForgotPasswordPage() {
           </div>
 
           {submitted ? (
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-green-500/20 text-green-700 dark:text-red-400">
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
               <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
-              <p className="text-sm">
-                If an account exists for <span className="font-semibold">{email}</span>, a password
-                reset link has been sent. Please check your inbox.
-              </p>
+              <div className="text-sm space-y-1">
+                <p className="font-medium">Reset link sent</p>
+                <p className="text-muted-foreground">
+                  If an account exists for <span className="font-semibold text-emerald-400">{email}</span>, a
+                  password reset link was sent. Check your inbox (and spam folder), then follow the link to
+                  set a new password.
+                </p>
+                <p className="text-muted-foreground pt-1">
+                  The link expires after 15 minutes. Didn't receive it? Go back and try again.
+                </p>
+              </div>
             </div>
           ) : (
             <div>
+              {error && (
+                <div className="flex items-start gap-3 p-4 mb-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
+                  <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                  <p className="text-sm font-medium">{error}</p>
+                </div>
+              )}
               <label className="block text-sm font-medium mb-2 flex items-center gap-2">
                 <Mail className="w-4 h-4" />
                 Email Address
@@ -95,6 +121,10 @@ export default function ForgotPasswordPage() {
                 required
                 disabled={isLoading}
               />
+              <p className="mt-3 text-xs text-muted-foreground leading-relaxed">
+                We'll send a password reset link to this email. Check your inbox (and spam folder)
+                and click the link to choose a new password.
+              </p>
             </div>
           )}
 

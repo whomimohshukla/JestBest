@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from './store/authStore';
+import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
 // Pages
@@ -47,7 +48,13 @@ const queryClient = new QueryClient({
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  return isAuthenticated ? <>{children}</> : <Navigate to="/auth/login" replace />;
+  return isAuthenticated ? (
+    <ErrorBoundary>
+      <>{children}</>
+    </ErrorBoundary>
+  ) : (
+    <Navigate to="/auth/login" replace />
+  );
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -60,6 +67,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <Router>
         <div className="min-h-screen bg-background text-foreground">
+          <ErrorBoundary>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
@@ -97,6 +105,7 @@ function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </ErrorBoundary>
         </div>
         <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#1a1a1a', color: '#fafafa', border: '1px solid #2a2a2a' } }} />
       </Router>

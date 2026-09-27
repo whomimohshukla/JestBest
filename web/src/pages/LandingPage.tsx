@@ -1,13 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  Bot, Sparkles, Shield, Zap, Brain, Bug, LineChart, GitBranch, Terminal,
-  CheckCircle2, Star, GitPullRequestArrow, MessagesSquare, ListTodo, Play,
-  Menu, X, Flame, Check, Plus, ArrowRight, ArrowLeft, Eye, Lock, Database,
-  Boxes, Network, MousePointerClick, Search, Cpu, RefreshCcw, Network as N3,
-  Database as DB3, Boxes as B3, Cpu as C3, MousePointerClick as M3,
-  ChevronDown,
+  Bot, Brain, Bug, LineChart, GitBranch, Terminal,
+  CheckCircle2, Play,
+  Flame, Check, Plus, ArrowRight, Database,
+  Boxes, MousePointerClick, Cpu, ChevronDown,
 } from 'lucide-react';
 import { FloatingNavbar } from '../components/FloatingNavbar';
 
@@ -32,8 +30,8 @@ const agents = [
 ];
 
 const plans = [
-  { name: 'Starter', monthly: 0, description: 'For solo developers trying AI QA.', features: ['1 project', '100 test runs / month', '3 AI agents', 'Community support'], cta: 'Start free', highlight: false },
-  { name: 'Pro', monthly: 79, description: 'For teams shipping every week.', features: ['Unlimited projects', '10,000 test runs / month', 'All AI agents', 'Priority support', 'CI/CD integrations'], cta: 'Start 14-day trial', highlight: true },
+  { name: 'Free', monthly: 0, description: 'For solo developers trying AI QA.', features: ['1 project', '5 test runs / month', 'Community support'], cta: 'Start free', highlight: false },
+  { name: 'Pro', monthly: 29, description: 'For teams shipping every week.', features: ['10 projects', '500 test runs / month', 'Email support', 'CI/CD integrations'], cta: 'Start 14-day trial', highlight: true },
   { name: 'Enterprise', monthly: null, description: 'For orgs with strict SLAs.', features: ['Unlimited runs', 'SSO & audit logs', 'Dedicated infra', 'Custom AI agents'], cta: 'Contact sales', highlight: false },
 ];
 
@@ -49,7 +47,6 @@ function scrollTo(id: string) {
 }
 
 export default function LandingPage() {
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   const heroNodes = [
@@ -313,12 +310,12 @@ export default function LandingPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-10">
               <div><h4 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Product</h4><ul className="mt-4 space-y-3 text-sm">{[['Features','#features'],['Pricing','#pricing'],['FAQ','#faq']].map(([l,h])=>(<li key={l}><a href={h} className="text-zinc-500 hover:text-white">{l}</a></li>))}</ul></div>
               <div><h4 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">AI</h4><ul className="mt-4 space-y-3 text-sm">{[['Test Explorer','#agents'],['Bug Hunter','#agents'],['Regression Analyst','#agents']].map(([l,h])=>(<li key={l}><a href={h} className="text-zinc-500 hover:text-white">{l}</a></li>))}</ul></div>
-              <div><h4 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Company</h4><ul className="mt-4 space-y-3 text-sm">{[['GitHub','https://github.com'],['Slack','#'],['Jira','#']].map(([l,h])=>(<li key={l}><a href={h} target={l==='GitHub'?'_blank':''} rel="noreferrer" className="text-zinc-500 hover:text-white">{l}</a></li>))}</ul></div>
+              <div><h4 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">Company</h4><ul className="mt-4 space-y-3 text-sm">{[['GitHub','https://github.com'],['Integrations','/integrations']].map(([l,h])=>(<li key={l}><a href={h} target={l==='GitHub'?'_blank':''} rel="noreferrer" className="text-zinc-500 hover:text-white">{l}</a></li>))}</ul></div>
             </div>
           </div>
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/10 pt-8">
             <p className="text-xs text-zinc-500">&copy; 2026 VeriBot, Inc. All rights reserved.</p>
-            <div className="flex gap-6 text-xs text-zinc-500"><a href="#" className="hover:text-white">Privacy</a><a href="#" className="hover:text-white">Terms</a><a href="#" className="hover:text-white">Security</a></div>
+            <div className="flex gap-6 text-xs text-zinc-500"><a href="/integrations" className="hover:text-white">Integrations</a><a href="/settings/profile" className="hover:text-white">Account</a><a href="/dashboard" className="hover:text-white">Dashboard</a></div>
           </div>
         </div>
       </footer>

@@ -7,7 +7,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-red-600 text-red-500-foreground shadow hover:bg-red-600/90',
+        default: 'bg-red-600 text-destructive-foreground shadow hover:bg-red-600/90',
         destructive: 'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90',
         outline: 'border border-border bg-transparent shadow-sm hover:bg-secondary/50 hover:text-foreground',
         secondary: 'bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80',
@@ -43,4 +43,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 );
 Button.displayName = 'Button';
 
+// shadcn/ui co-locates the cva() variant builder with the component so
+// consumers can reuse it in their own className. allowConstantExport does
+// not cover it because cva() is a call, not a literal.
+// eslint-disable-next-line react-refresh/only-export-components
 export { Button, buttonVariants };

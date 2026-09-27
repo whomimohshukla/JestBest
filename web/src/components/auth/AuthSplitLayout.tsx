@@ -1,7 +1,7 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bot, Sparkles, Zap, Bug, CheckCircle2, GitBranch, Database, ArrowRight } from 'lucide-react';
+import { Bot, Zap, Bug, CheckCircle2, GitBranch, Database } from 'lucide-react';
 
 interface AuthSplitLayoutProps {
   children: ReactNode;

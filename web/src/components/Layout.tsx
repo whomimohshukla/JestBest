@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '../utils/cn';
+import { OfflineBanner } from './ui/OfflineBanner';
+import { authApi } from '../api';
 
 interface LayoutProps {
   children: ReactNode;
@@ -51,14 +53,21 @@ export default function Layout({ children }: LayoutProps) {
   const logout = useAuthStore((state) => state.logout);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [confirmLogoutOpen, setConfirmLogoutOpen] = useState(false);
 
   const isActive = (path: string) => {
     if (path === '/dashboard') return location.pathname === path;
     return location.pathname.startsWith(path);
   };
 
-  const handleLogout = () => {
+  const handleLogoutConfirm = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // local logout should still proceed even if the session API fails
+    }
     logout();
+    setConfirmLogoutOpen(false);
     navigate('/');
   };
 
@@ -141,7 +150,10 @@ export default function Layout({ children }: LayoutProps) {
                       Settings
                     </Link>
                     <button
-                      onClick={handleLogout}
+                      onClick={() => {
+                        setProfileOpen(false);
+                        setConfirmLogoutOpen(true);
+                      }}
                       className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-destructive/10 hover:text-destructive"
                     >
                       <LogOut className="w-4 h-4" />
@@ -178,7 +190,7 @@ export default function Layout({ children }: LayoutProps) {
                             onClick={() => setMobileMenuOpen(false)}
                             className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors mb-1 ${
                               isActive(item.href)
-                                ? 'bg-red-600 text-red-500-foreground'
+                                ? 'bg-red-600 text-destructive-foreground'
                                 : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
                             }`}
                           >
@@ -194,6 +206,8 @@ export default function Layout({ children }: LayoutProps) {
           )}
         </AnimatePresence>
       </header>
+
+      <OfflineBanner />
 
       <div className="flex">
         {/* Desktop Sidebar */}
@@ -244,6 +258,54 @@ export default function Layout({ children }: LayoutProps) {
           <div className="container mx-auto px-4 lg:px-6 py-8">{children}</div>
         </main>
       </div>
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {confirmLogoutOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            onClick={() => setConfirmLogoutOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl"
+            >
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <LogOut className="w-5 h-5 text-destructive" />
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold">Log out?</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    You will need to sign in again to access your workspace.
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setConfirmLogoutOpen(false)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-secondary hover:bg-secondary/80 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleLogoutConfirm}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-destructive hover:bg-destructive/90 text-white transition-colors"
+                >
+                  Log out
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,5 +1,16 @@
 import { apiGet, apiPost, apiPatch, apiDelete, apiPaginated } from './client';
-import type { Project, Application, TestCase, TestRun, TestResult, Bug, Paginated } from '../types';
+import type {
+  Project,
+  Application,
+  TestCase,
+  TestRun,
+  TestResult,
+  Bug,
+  Paginated,
+  DashboardAnalytics,
+  TestMetricsResponse,
+  AgentMetrics,
+} from '../types';
 
 export interface BugComment {
   id: string;
@@ -48,8 +59,13 @@ export const testCasesApi = {
   archive: (id: string) => apiPatch<TestCase>(`/test-cases/${id}/archive`),
   duplicate: (id: string) =>
     apiPost<TestCase>(`/test-cases/${id}/duplicate`),
-  generate: (data: { projectId: string; count?: number; type?: string; scopes?: string[]; instructions?: string }) =>
-    apiPost<{ message: string; testCases: TestCase[] }>('/test-cases/generate', data),
+  generate: (data: {
+    applicationId: string;
+    projectId: string;
+    requirements?: string;
+    types?: string[];
+    count?: number;
+  }) => apiPost<{ queued: boolean }>('/test-cases/generate', data),
 };
 
 export interface TestSuite {
@@ -58,6 +74,7 @@ export interface TestSuite {
   name: string;
   description: string | null;
   testCases: TestCase[];
+  items: Array<{ id: string; testCaseId: string; order: number }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -103,13 +120,31 @@ export const bugsApi = {
   comments: (id: string) => apiGet<Paginated<BugComment>>(`/bugs/${id}/comments`),
   addComment: (id: string, content: string) =>
     apiPost<BugComment>(`/bugs/${id}/comments`, { content }),
+  raiseOnGithub: (id: string) => apiPost<Bug>(`/bugs/${id}/raise-github`, {}),
 };
 
 export const analyticsApi = {
   dashboard: (projectId?: string) =>
-    apiGet<Record<string, unknown>>('/analytics/dashboard', { projectId }),
+    apiGet<DashboardAnalytics>('/analytics/dashboard', { projectId }),
   testMetrics: (params?: Record<string, unknown>) =>
-    apiGet<Record<string, unknown>>('/analytics/tests', params),
+    apiGet<TestMetricsResponse>('/analytics/tests', params),
   agentMetrics: (params?: Record<string, unknown>) =>
-    apiGet<Record<string, unknown>>('/analytics/agents', params),
+    apiGet<AgentMetrics>('/analytics/agents', params),
+  generateReport: (data: { projectId?: string; testRunId?: string } = {}) =>
+    apiPost<{ generated: boolean; queued: boolean }>('/analytics/reports', data),
+};
+
+// ===== Notification preferences (persisted via user profile metadata) =====
+export interface NotificationPreferences {
+  channels: string[];
+  events: string[];
+}
+
+export const notificationsApi = {
+  get: async () => {
+    const me = await apiGet<{ notificationPreferences?: NotificationPreferences }>('/users/me');
+    return me.notificationPreferences ?? { channels: ['email'], events: [] };
+  },
+  update: (prefs: NotificationPreferences) =>
+    apiPatch<{ message: string }>('/users/me', { notificationPreferences: prefs }),
 };

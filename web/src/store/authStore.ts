@@ -33,7 +33,7 @@ const restoreUser = (): User | null => {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: restoreUser(),
       organization: null,
       token: localStorage.getItem('accessToken'),

@@ -35,7 +35,10 @@ async function probe(url: string, timeoutMs = 3500): Promise<boolean> {
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
-    const candidates = [url, `${url}/api/v1/health`, `${url}/health`, `${url}/api/health`];
+    const origin = (() => {
+      try { return new URL(url).origin; } catch { return DEFAULT_API_URL; }
+    })();
+    const candidates = [`${origin}/api/v1/health`, origin];
     for (const c of candidates) {
       try {
         const r = await fetch(c, { signal: ctrl.signal });

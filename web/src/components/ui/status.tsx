@@ -45,6 +45,9 @@ export const PriorityBadge = ({ priority }: { priority: string }) => {
     P1: { label: 'P1', variant: 'warning' },
     P2: { label: 'P2', variant: 'secondary' },
     P3: { label: 'P3', variant: 'success' },
+    high: { label: 'High', variant: 'destructive' },
+    medium: { label: 'Medium', variant: 'warning' },
+    low: { label: 'Low', variant: 'secondary' },
   };
   const config = map[priority] ?? { label: priority, variant: 'secondary' as const };
   return <Badge variant={config.variant}>{config.label}</Badge>;

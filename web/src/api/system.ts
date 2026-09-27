@@ -1,17 +1,33 @@
 import { apiGet, apiPost, apiPatch, apiDelete, apiPaginated } from './client';
-import type { Agent, AgentRun, Integration, Webhook, WebhookDelivery, ApiKey, Billing } from '../types';
+import type { AgentRun, Integration, Webhook, WebhookDelivery, ApiKey, Billing, User } from '../types';
 
 export const usersApi = {
-  me: () => apiGet<{ id: string; email: string; name: string | null; avatar: string | null }>('/users/me'),
+  me: () =>
+    apiGet<
+      User & {
+        notificationPreferences?: { channels?: string[]; events?: string[] };
+      }
+    >('/users/me'),
   updateMe: (data: Record<string, unknown>) =>
-    apiPatch<{ id: string; email: string; name: string | null }>('/users/me', data),
+    apiPatch<User>('/users/me', data),
   changePassword: (data: { currentPassword: string; newPassword: string }) =>
     apiPost<{ message: string }>('/users/me/change-password', data),
+  setup2fa: (data: { password: string }) =>
+    apiPost<{ secret: string; otpauthUrl: string; qrDataUrl: string }>('/users/me/2fa/setup', data),
+  enable2fa: (data: { code: string }) =>
+    apiPost<User>('/users/me/2fa/enable', data),
+  disable2fa: (data: { password: string; code?: string }) =>
+    apiPost<User>('/users/me/2fa/disable', data),
+  suspendAccount: (data: { days: number }) =>
+    apiPost<User>('/users/me/suspend', data),
+  reactivateAccount: () =>
+    apiPost<User>('/users/me/reactivate', {}),
+  deleteMe: () => apiDelete<{ message: string }>('/users/me'),
 };
 
 export const agentsApi = {
-  trigger: (data: { agentType: string; projectId?: string; config?: Record<string, unknown> }) =>
-    apiPost<{ runId: string }>('/agents/trigger', data),
+  trigger: (data: { agentType: string; projectId?: string; applicationId?: string; config?: Record<string, unknown> }) =>
+    apiPost<AgentRun>('/agents/trigger', data),
   runs: (params?: Record<string, unknown>) =>
     apiPaginated<AgentRun>('/agents/runs', params),
   run: (id: string) => apiGet<AgentRun>(`/agents/runs/${id}`),
@@ -45,7 +61,7 @@ export const webhooksApi = {
 export const apiKeysApi = {
   list: () => apiGet<ApiKey[]>('/api-keys'),
   create: (data: { name: string; scopes?: string[] }) =>
-    apiPost<ApiKey & { rawKey: string }>('/api-keys', data),
+    apiPost<ApiKey & { plainKey: string }>('/api-keys', data),
   revoke: (id: string) => apiDelete<{ message: string }>(`/api-keys/${id}`),
 };
 

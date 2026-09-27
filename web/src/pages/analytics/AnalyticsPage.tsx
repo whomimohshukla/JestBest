@@ -5,6 +5,7 @@ import {
   Bug,
   CheckCircle2,
   FolderKanban,
+  RefreshCw,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -19,62 +20,23 @@ import {
 import { analyticsApi } from '../../api';
 import Layout from '../../components/Layout';
 import { PageHeader, StatCard, PageLoader, EmptyState, Badge } from '../../components/ui';
-import type { TestRun } from '../../types';
-
-interface DashboardData {
-  projects?: number;
-  recentRuns?: TestRun[];
-  openBugs?: number;
-  totalCases?: number;
-  quality?: {
-    score: number;
-    level: string;
-    components: {
-      passRate: number;
-      testCoverage: number;
-      bugBurden: number;
-      flakiness: number;
-    };
-  };
-  risk?: {
-    riskScore: number;
-    riskLevel: string;
-    details: {
-      openCriticalBugs: number;
-      failureRate: number;
-      qualityScore: number;
-    };
-  };
-}
-
-interface DailyPoint {
-  date: string;
-  runs: number;
-  passed: number;
-  failed: number;
-  skipped: number;
-}
-
-interface MetricsData {
-  daily?: DailyPoint[];
-  totals?: {
-    runs: number;
-    passed: number;
-    failed: number;
-    skipped: number;
-    passRate: number;
-  };
-}
+import type { DashboardAnalytics, TestMetricsResponse } from '../../types';
 
 export default function AnalyticsPage() {
-  const { data: dash, isLoading } = useQuery({
+  const {
+    data: dash,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery<DashboardAnalytics>({
     queryKey: ['analytics-dashboard'],
-    queryFn: () => analyticsApi.dashboard() as unknown as Promise<DashboardData>,
+    queryFn: () => analyticsApi.dashboard(),
   });
 
-  const { data: metrics } = useQuery({
+  const { data: metrics } = useQuery<TestMetricsResponse>({
     queryKey: ['analytics-test-metrics'],
-    queryFn: () => analyticsApi.testMetrics({}) as unknown as Promise<MetricsData>,
+    queryFn: () => analyticsApi.testMetrics({}),
   });
 
   const daily = metrics?.daily ?? [];
@@ -85,7 +47,7 @@ export default function AnalyticsPage() {
     { label: 'Total Test Cases', value: dash?.totalCases ?? 0, icon: Activity, accent: 'info' as const },
     { label: 'Pass Rate', value: passRate, icon: CheckCircle2, accent: 'success' as const },
     { label: 'Open Bugs', value: dash?.openBugs ?? 0, icon: Bug, accent: 'danger' as const },
-    { label: 'Project Count', value: dash?.projects ?? 0, icon: FolderKanban, accent: 'default' as const },
+    { label: 'Project Count', value: dash?.projects?.length ?? 0, icon: FolderKanban, accent: 'default' as const },
   ];
 
   return (
@@ -97,6 +59,17 @@ export default function AnalyticsPage() {
 
       {isLoading ? (
         <PageLoader label="Loading analytics..." />
+      ) : isError ? (
+        <div className="glass rounded-xl p-8 text-center">
+          <p className="text-red-500 font-medium mb-4">Failed to load analytics.</p>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Retry
+          </button>
+        </div>
       ) : (
         <motion.div
           initial={{ opacity: 0 }}
@@ -167,10 +140,10 @@ export default function AnalyticsPage() {
                           dash.risk.riskLevel === 'CRITICAL'
                             ? 'bg-red-500'
                             : dash.risk.riskLevel === 'HIGH'
-                              ? 'bg-red-500'
+                              ? 'bg-orange-500'
                               : dash.risk.riskLevel === 'MEDIUM'
                                 ? 'bg-yellow-400'
-                                : 'bg-red-500'
+                                : 'bg-emerald-500'
                         }`}
                         style={{ width: `${dash.risk.riskScore}%` }}
                       />

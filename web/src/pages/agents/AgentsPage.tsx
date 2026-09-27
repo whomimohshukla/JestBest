@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { agentsApi, projectsApi } from '../../api';
+import { agentsApi, projectsApi, applicationsApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
@@ -13,44 +13,49 @@ import {
   GitBranch,
   Bug,
   Ban,
+  Eye,
+  X,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { PageLoader, EmptyState } from '../../components/ui';
+import { PageLoader, EmptyState, Select } from '../../components/ui';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/ui';
 import type { AgentRun } from '../../types';
 import type { LucideIcon } from 'lucide-react';
 
 const AGENT_PROFILES: Record<string, { label: string; icon: LucideIcon; description: string }> = {
-  TEST_EXPLORER: {
+  EXPLORER: {
     label: 'Test Explorer',
     icon: Bot,
     description: 'Explores your app and generates test cases automatically.',
   },
-  BUG_HUNTER: {
-    label: 'Bug Hunter',
+  BUG_AGENT: {
+    label: 'Bug Agent',
     icon: Bug,
     description: 'Heads-up bug detection during exploratory runs; files bugs with evidence.',
   },
-  REGRESSION_ANALYST: {
-    label: 'Regression Analyst',
+  FAILURE_ANALYZER: {
+    label: 'Failure Analyzer',
     icon: GitBranch,
     description: 'Analyzes regressions and flaky tests, identifies root cause.',
   },
-  PERFORMANCE_AUDITOR: {
-    label: 'Performance Auditor',
+  TEST_GENERATOR: {
+    label: 'Test Generator',
     icon: Zap,
-    description: 'Audits response times across critical user flows.',
+    description: 'Generates resilient test suites from requirements and app structure.',
   },
 };
 
-const AGENT_TYPE_ORDER = ['TEST_EXPLORER', 'BUG_HUNTER', 'REGRESSION_ANALYST', 'PERFORMANCE_AUDITOR'];
+const AGENT_TYPE_ORDER = ['EXPLORER', 'BUG_AGENT', 'FAILURE_ANALYZER', 'TEST_GENERATOR'];
 
 const STATUS_MAP: Record<string, { label: string; className: string }> = {
-  COMPLETED: { label: 'Completed', className: 'bg-red-500/15 text-red-400' },
-  RUNNING: { label: 'Running', className: 'bg-red-500/15 text-red-400' },
+  COMPLETED: { label: 'Completed', className: 'bg-emerald-500/15 text-emerald-500' },
+  RUNNING: { label: 'Running', className: 'bg-sky-500/15 text-sky-400' },
   FAILED: { label: 'Failed', className: 'bg-red-500/15 text-red-400' },
-  PENDING: { label: 'Pending', className: 'bg-red-500/15 text-red-400' },
-  PAUSED: { label: 'Paused', className: 'bg-red-500/15 text-red-400' },
+  PENDING: { label: 'Pending', className: 'bg-amber-500/15 text-amber-400' },
+  PAUSED: { label: 'Paused', className: 'bg-amber-500/15 text-amber-400' },
+  TIMEOUT: { label: 'Timeout', className: 'bg-red-500/15 text-red-400' },
   QUEUED: { label: 'Queued', className: 'bg-zinc-500/15 text-zinc-400' },
   CANCELLED: { label: 'Cancelled', className: 'bg-zinc-500/15 text-zinc-400' },
 };
@@ -69,10 +74,18 @@ function AgentStatusBadge({ status }: { status: string }) {
 export default function AgentsPage() {
   const queryClient = useQueryClient();
   const [showTriggerModal, setShowTriggerModal] = useState(false);
-  const [selectedAgent, setSelectedAgent] = useState('TEST_EXPLORER');
+  const [selectedAgent, setSelectedAgent] = useState('EXPLORER');
   const [selectedProject, setSelectedProject] = useState('');
+  const [selectedApplication, setSelectedApplication] = useState('');
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
-  const { data: runList, isLoading } = useQuery({
+  const { data: selectedRun, isLoading: isLoadingRun } = useQuery({
+    queryKey: ['agent-run', selectedRunId],
+    queryFn: () => agentsApi.run(selectedRunId as string),
+    enabled: Boolean(selectedRunId),
+  });
+
+  const { data: runList, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['agent-runs'],
     queryFn: () => agentsApi.runs({ pageSize: 100 }),
   });
@@ -82,13 +95,21 @@ export default function AgentsPage() {
     queryFn: () => projectsApi.list({ pageSize: 100 }),
   });
 
+  const { data: applicationList } = useQuery({
+    queryKey: ['applications', 'agent-trigger', selectedProject],
+    queryFn: () => applicationsApi.list(selectedProject),
+    enabled: !!selectedProject,
+  });
+
   const triggerMutation = useMutation({
-    mutationFn: (data: { agentType: string; projectId: string }) => agentsApi.trigger(data),
+    mutationFn: (data: { agentType: string; projectId: string; applicationId?: string }) =>
+      agentsApi.trigger(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['agent-runs'] });
       toast.success('Agent run triggered');
       setShowTriggerModal(false);
       setSelectedProject('');
+      setSelectedApplication('');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -110,13 +131,17 @@ export default function AgentsPage() {
   const isCancelable = (run: AgentRun) => !['COMPLETED', 'FAILED', 'CANCELLED'].includes(run.status);
 
   const agentLabel = (agentId: string) => {
-    const type = AGENT_TYPE_ORDER.find((t) => agentId.includes(t));
+    const type = AGENT_TYPE_ORDER.find((t) => agentId.includes(t) || agentId === t);
     return type ? AGENT_PROFILES[type].label : agentId;
   };
 
   const handleTrigger = (e: React.FormEvent) => {
     e.preventDefault();
-    triggerMutation.mutate({ agentType: selectedAgent, projectId: selectedProject });
+    triggerMutation.mutate({
+      agentType: selectedAgent,
+      projectId: selectedProject,
+      ...(selectedAgent === 'TEST_GENERATOR' && selectedApplication ? { applicationId: selectedApplication } : {}),
+    });
   };
 
   return (
@@ -176,8 +201,22 @@ export default function AgentsPage() {
         {/* Loading State */}
         {isLoading && <PageLoader label="Loading agent runs..." />}
 
+        {/* Error State */}
+        {!isLoading && isError && (
+          <div className="glass rounded-xl p-8 text-center">
+            <p className="text-red-500 font-medium mb-4">Failed to load agent runs.</p>
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Empty State */}
-        {!isLoading && runs.length === 0 && (
+        {!isLoading && !isError && runs.length === 0 && (
           <EmptyState
             icon={Bot}
             title="No agent runs yet"
@@ -195,7 +234,7 @@ export default function AgentsPage() {
         )}
 
         {/* Runs Table */}
-        {!isLoading && runs.length > 0 && (
+        {!isLoading && !isError && runs.length > 0 && (
           <div className="glass rounded-xl overflow-hidden">
             <Table>
               <TableHeader>
@@ -215,7 +254,7 @@ export default function AgentsPage() {
                     <TableCell className="font-mono text-sm text-muted-foreground">
                       #{run.id.slice(0, 8)}
                     </TableCell>
-                    <TableCell className="font-medium">{agentLabel(run.agentId)}</TableCell>
+                    <TableCell className="font-medium">{agentLabel(run.agentType)}</TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">
                       {(run.projectId ?? '').slice(0, 8)}
                     </TableCell>
@@ -229,20 +268,29 @@ export default function AgentsPage() {
                       {run.completedAt ? new Date(run.completedAt).toLocaleString() : '—'}
                     </TableCell>
                     <TableCell>
-                      {isCancelable(run) && (
+                      <div className="flex items-center gap-2 justify-end">
                         <button
-                          onClick={() => {
-                            if (window.confirm(`Cancel agent run #${run.id.slice(0, 8)}?`)) {
-                              cancelRunMutation.mutate(run.id);
-                            }
-                          }}
-                          disabled={cancelRunMutation.isPending}
-                          className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors flex items-center gap-2 text-red-500 disabled:opacity-50"
+                          onClick={() => setSelectedRunId(run.id)}
+                          className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors flex items-center gap-2"
                         >
-                          <Ban className="w-4 h-4" />
-                          Cancel
+                          <Eye className="w-4 h-4" />
+                          View
                         </button>
-                      )}
+                        {isCancelable(run) && (
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Cancel agent run #${run.id.slice(0, 8)}?`)) {
+                                cancelRunMutation.mutate(run.id);
+                              }
+                            }}
+                            disabled={cancelRunMutation.isPending}
+                            className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors flex items-center gap-2 text-red-500 disabled:opacity-50"
+                          >
+                            <Ban className="w-4 h-4" />
+                            Cancel
+                          </button>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -251,6 +299,73 @@ export default function AgentsPage() {
           </div>
         )}
       </motion.div>
+
+      {/* Run Detail Modal */}
+      {selectedRunId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full max-w-2xl glass p-8 rounded-2xl"
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold">Agent Run #{selectedRun?.id?.slice(0, 8) ?? selectedRunId.slice(0, 8)}</h2>
+                <p className="text-muted-foreground text-sm mt-1">
+                  {selectedRun
+                    ? `${agentLabel(selectedRun.agentType)} • ${selectedRun.status}`
+                    : 'Loading run details...'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedRun?.status === 'COMPLETED' ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                ) : selectedRun?.status === 'FAILED' || selectedRun?.status === 'CANCELLED' ? (
+                  <XCircle className="w-5 h-5 text-red-500" />
+                ) : (
+                  <Loader2 className="w-5 h-5 animate-spin text-red-500" />
+                )}
+                <button
+                  onClick={() => setSelectedRunId(null)}
+                  className="p-2 hover:bg-secondary rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {isLoadingRun && <PageLoader label="Loading run details..." />}
+
+            {selectedRun && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="p-4 bg-secondary/30 rounded-lg">
+                    <p className="text-muted-foreground mb-1">Started</p>
+                    <p>{selectedRun.startedAt ? new Date(selectedRun.startedAt).toLocaleString() : '—'}</p>
+                  </div>
+                  <div className="p-4 bg-secondary/30 rounded-lg">
+                    <p className="text-muted-foreground mb-1">Completed</p>
+                    <p>{selectedRun.completedAt ? new Date(selectedRun.completedAt).toLocaleString() : '—'}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-2">Result</h3>
+                  {selectedRun.output ? (
+                    <pre className="p-4 bg-black/40 border border-border rounded-lg overflow-auto max-h-80 text-xs leading-relaxed whitespace-pre-wrap">
+                      {JSON.stringify(selectedRun.output, null, 2)}
+                    </pre>
+                  ) : (
+                    <p className="text-muted-foreground text-sm">
+                      No result available yet for this run.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
 
       {/* Trigger Agent Modal */}
       {showTriggerModal && (
@@ -295,7 +410,7 @@ export default function AgentsPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">Project</label>
-                <select
+                <Select
                   value={selectedProject}
                   onChange={(e) => setSelectedProject(e.target.value)}
                   className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -308,8 +423,30 @@ export default function AgentsPage() {
                       {project.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
+
+              {selectedAgent === 'TEST_GENERATOR' && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Application</label>
+                  <Select
+                    value={selectedApplication}
+                    onChange={(e) => setSelectedApplication(e.target.value)}
+                    className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                    disabled={triggerMutation.isPending || !selectedProject}
+                  >
+                    <option value="">Select an application (optional)</option>
+                    {(applicationList ?? []).map((app) => (
+                      <option key={app.id} value={app.id}>
+                        {app.name}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    The generator uses the application map to build targeted test cases.
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <button

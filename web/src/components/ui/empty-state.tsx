@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { cva, type VariantProps } from 'class-variance-authority';
+import { cva } from 'class-variance-authority';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
@@ -59,10 +59,10 @@ interface StatCardProps {
 
 const accentMap: Record<NonNullable<StatCardProps['accent']>, string> = {
   default: 'text-foreground',
-  success: 'text-red-400',
-  warning: 'text-red-400',
+  success: 'text-emerald-500',
+  warning: 'text-amber-400',
   danger: 'text-red-400',
-  info: 'text-red-400',
+  info: 'text-sky-400',
 };
 
 export function StatCard({ label, value, icon: Icon, hint, accent = 'default', isLoading }: StatCardProps) {

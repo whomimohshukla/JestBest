@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi, applicationsApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
-import { PageLoader, EmptyState, Badge } from '../../components/ui';
+import { PageLoader, Select, EmptyState, Badge } from '../../components/ui';
 import {
   Plus,
   Globe,
@@ -40,11 +40,13 @@ export default function ApplicationsPage() {
     queryFn: () => projectsApi.list({ pageSize: 100 }),
   });
 
-  const { data: applications, isLoading } = useQuery({
+  const { data: applications, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['applications', selectedProjectId],
     queryFn: () => applicationsApi.list(selectedProjectId as string),
     enabled: !!selectedProjectId,
   });
+
+  const projectsError = projectsData === undefined && !projectsLoading;
 
   const createMutation = useMutation({
     mutationFn: (data: { projectId: string; name: string; baseUrl: string; description?: string; type?: string }) =>
@@ -128,22 +130,38 @@ export default function ApplicationsPage() {
 
         {/* Project Selector */}
         <div className="mb-8">
-          <select
+          <Select
             value={selectedProjectId ?? ''}
             onChange={(e) => setSelectedProjectId(e.target.value || null)}
-            className="w-full md:w-64 px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-full md:w-64 px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-60"
+            disabled={projectsLoading}
           >
-            <option value="">Select a project…</option>
+            <option value="">{projectsLoading ? 'Loading projects…' : 'Select a project…'}</option>
             {(projectsData?.items ?? []).map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Loading State */}
         {isLoading && <PageLoader label="Loading applications..." />}
+
+        {/* Query error */}
+        {isError && (
+          <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card/50 px-6 py-16 text-center">
+            <p className="text-sm font-medium text-red-400">Failed to load applications.</p>
+            <p className="text-sm text-muted-foreground">{projectsError ? '' : 'Check your connection and try again.'}</p>            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 transition-colors disabled:opacity-50"
+            >
+              {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* No project selected */}
         {!isLoading && !selectedProjectId && (
@@ -155,7 +173,7 @@ export default function ApplicationsPage() {
         )}
 
         {/* Empty list */}
-        {!isLoading && selectedProjectId && (!applications || applications.length === 0) && (
+        {!isLoading && !isError && selectedProjectId && (!applications || applications.length === 0) && (
           <EmptyState
             icon={Layers}
             title="No applications yet"
@@ -173,7 +191,7 @@ export default function ApplicationsPage() {
         )}
 
         {/* Applications Grid */}
-        {!isLoading && selectedProjectId && applications && applications.length > 0 && (
+        {!isLoading && !isError && selectedProjectId && applications && applications.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {applications.map((app, index) => (
               <motion.div
@@ -291,7 +309,7 @@ export default function ApplicationsPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">Type</label>
-                <select
+                <Select
                   value={newApp.type}
                   onChange={(e) => setNewApp({ ...newApp, type: e.target.value })}
                   className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -302,7 +320,7 @@ export default function ApplicationsPage() {
                       {type}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div className="flex gap-3 pt-4">

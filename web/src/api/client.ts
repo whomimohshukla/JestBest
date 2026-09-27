@@ -1,7 +1,11 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse, ApiError, Paginated } from '../types';
+import { useBackendStore } from '../lib/backend';
+import toast from 'react-hot-toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
+
+let offlineToastShownAt = 0;
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -80,9 +84,12 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor - Handle 401 with refresh
+// Response interceptor - Handle 401 with refresh + global network/server failures
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    useBackendStore.setState({ status: 'online' });
+    return response;
+  },
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
@@ -101,16 +108,73 @@ apiClient.interceptors.response.use(
         return Promise.reject(refreshError);
       }
     }
+
+    // Global server/network down handling: no HTTP response means the backend
+    // is unreachable, a timeout, or a 502/503/504 gateway failure.
+    const transportDown = !error.response ||
+      error.code === 'ERR_NETWORK' ||
+      error.code === 'ECONNABORTED' ||
+      error.code === 'ETIMEDOUT' ||
+      (error.response?.status != null && error.response.status >= 500);
+
+    if (transportDown) {
+      useBackendStore.setState({ status: 'offline' });
+      const now = Date.now();
+      if (now - offlineToastShownAt > 25000) {
+        offlineToastShownAt = now;
+        toast.error(
+          error.code === 'ECONNABORTED'
+            ? 'The server took too long to respond. Please try again.'
+            : 'Cannot reach the server. Make sure the backend is running and try again.',
+          { duration: 5000 }
+        );
+      }
+    }
+
     return Promise.reject(error);
   }
 );
 
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError<ApiError>(error)) {
-    return error.response?.data?.message || error.response?.data?.error || error.message || 'Something went wrong';
+    if (!error.response) {
+      if (error.code === 'ECONNABORTED') return 'The server took too long to respond. Please try again.';
+      return 'Cannot reach the server. Make sure the backend is running and try again.';
+    }
+    const status = error.response.status;
+    const data = error.response.data;
+    const nested = data && typeof data.error === 'object' ? data.error : null;
+    const message =
+      (nested && typeof nested.message === 'string' ? nested.message : undefined) ||
+      data?.message ||
+      data?.error ||
+      error.message ||
+      'Something went wrong';
+    if (status >= 500) return 'Something went wrong on the server. Please try again in a moment.';
+    return typeof message === 'string' ? message : 'Something went wrong';
   }
   if (error instanceof Error) return error.message;
   return 'Something went wrong';
+};
+
+export const getErrorCode = (error: unknown): string => {
+  if (axios.isAxiosError<ApiError>(error)) {
+    const data = error.response?.data;
+    const code =
+      (data?.error && typeof data.error === 'object' ? (data.error as { code?: string }).code : undefined) ||
+      error.response?.status?.toString();
+    return code ?? 'UNKNOWN';
+  }
+  return 'UNKNOWN';
+};
+
+export const getErrorKind = (error: unknown): 'network' | 'server' | 'auth' | 'generic' => {
+  if (axios.isAxiosError<ApiError>(error)) {
+    if (!error.response) return 'network';
+    if (error.response.status >= 500) return 'server';
+    if (error.response.status === 401 || error.response.status === 403) return 'auth';
+  }
+  return 'generic';
 };
 
 // Typed helpers

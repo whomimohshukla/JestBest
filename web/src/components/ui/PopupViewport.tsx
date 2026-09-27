@@ -1,9 +1,9 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, XCircle, Info, Loader2, X } from 'lucide-react';
-import { usePopupStore } from '../lib/toast-popup';
+import { usePopupStore, type PopupItem } from '../../lib/toast-popup';
 
-const KIND_ICON: Record<string, { Icon: any; cls: string }> = {
+const KIND_ICON: Record<string, { Icon: typeof CheckCircle2; cls: string }> = {
   success: { Icon: CheckCircle2, cls: 'text-red-400' },
   error: { Icon: XCircle, cls: 'text-red-500' },
   info: { Icon: Info, cls: 'text-red-400' },
@@ -15,7 +15,7 @@ export function PopupViewport() {
   return (
     <div className="pointer-events-none fixed inset-x-0 top-6 z-[120] flex flex-col items-center gap-3 px-4">
       <AnimatePresence>
-        {popups.map((p) => {
+        {popups.map((p: PopupItem) => {
           const { Icon, cls } = KIND_ICON[p.kind] ?? KIND_ICON.info;
           return (
             <motion.div key={p.id} layout initial={{ opacity: 0, y: -18, scale: 0.95 }}

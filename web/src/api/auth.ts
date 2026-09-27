@@ -1,9 +1,11 @@
 import { apiGet, apiPost, apiPatch, apiDelete } from './client';
-import type { AuthResult, RegisterInput, User, Organization, Membership, OrganizationInvite, AuditLogEntry } from '../types';
+import type { AuthResult, AuthResponse, RegisterInput, User, Organization, Membership, OrganizationInvite, AuditLogEntry } from '../types';
 
 export const authApi = {
   login: (email: string, password: string) =>
-    apiPost<AuthResult>('/auth/login', { email, password }),
+    apiPost<AuthResponse>('/auth/login', { email, password }),
+  verify2fa: (token: string, code: string) =>
+    apiPost<AuthResult>('/auth/verify-2fa', { token, code }),
   register: (data: RegisterInput) =>
     apiPost<AuthResult>('/auth/register', data),
   refreshToken: (refreshToken: string) =>
