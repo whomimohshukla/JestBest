@@ -12,13 +12,12 @@ import {
   ShieldAlert,
   MessageSquare,
   CheckSquare,
-  Plug,
   ExternalLink,
   Trash2,
   PlugZap,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { PageLoader, EmptyState, Badge } from '../../components/ui';
+import { PageLoader, Badge } from '../../components/ui';
 import type { LucideIcon } from 'lucide-react';
 
 interface IntegrationField {
@@ -39,9 +38,10 @@ const INTEGRATION_META: Record<string, IntegrationMeta> = {
   GITHUB: {
     name: 'GitHub',
     icon: GitBranch,
-    description: 'Sync issues, pull requests and CI status from GitHub.',
+    description: 'Auto-report bugs as GitHub issues and sync them back to VeriBot.',
     fields: [
       { key: 'token', label: 'Access Token', type: 'password', placeholder: 'ghp_...' },
+      { key: 'repository', label: 'Repository', placeholder: 'owner/repo' },
       { key: 'apiUrl', label: 'API URL', placeholder: 'https://api.github.com' },
     ],
   },
@@ -96,7 +96,7 @@ export default function IntegrationsPage() {
   const [connectType, setConnectType] = useState<string | null>(null);
   const [configForm, setConfigForm] = useState<Record<string, string>>({});
 
-  const { data: integrations, isLoading } = useQuery({
+  const { data: integrations, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['integrations'],
     queryFn: () =>
       integrationsApi.list() as unknown as Promise<IntegrationItem[]>,
@@ -137,6 +137,8 @@ export default function IntegrationsPage() {
   });
 
   const items = integrations ?? [];
+  const CATALOG_TYPES = ['GITHUB', 'JIRA', 'SLACK'];
+  const connectedTypes = new Set(items.map((i) => i.type));
   const meta = connectType ? (INTEGRATION_META[connectType] ?? null) : null;
 
   const handleConnectSubmit = (e: React.FormEvent) => {
@@ -159,10 +161,11 @@ export default function IntegrationsPage() {
             <p className="text-muted-foreground">Connect your workflow tools</p>
           </div>
           <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ['integrations'] })}
-            className="flex items-center gap-2 px-4 py-3 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors font-medium"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            className="flex items-center gap-2 px-4 py-3 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors font-medium disabled:opacity-60"
           >
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className={`w-5 h-5 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
@@ -170,63 +173,53 @@ export default function IntegrationsPage() {
         {/* Loading State */}
         {isLoading && <PageLoader label="Loading integrations..." />}
 
-        {/* Empty State */}
-        {!isLoading && items.length === 0 && (
-          <EmptyState
-            icon={Plug}
-            title="No integrations available"
-            description="Supported integrations will appear here so you can connect your workflow tools."
-          />
+        {/* Error State */}
+        {!isLoading && isError && (
+          <div className="glass rounded-xl p-8 text-center">
+            <p className="text-red-500 font-medium mb-4">Failed to load integrations.</p>
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+          </div>
         )}
 
-        {/* Integrations Grid */}
-        {!isLoading && items.length > 0 && (
+        {/* Integrations Grid — always show the available catalog */}
+        {!isLoading && !isError && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {items.map((item, index) => {
-              const integrationMeta = INTEGRATION_META[item.type] ?? {
-                name: item.name || item.type,
-                icon: Plug,
-                description: 'Third-party integration.',
-                fields: [],
-              };
-              const Icon = integrationMeta.icon;
-              const isConnected = !!item.id;
-              return (
-                <motion.div
-                  key={item.id ?? item.type}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="glass p-6 rounded-xl"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 bg-red-600/10 rounded-lg flex items-center justify-center">
-                      <Icon className="w-6 h-6 text-red-500" />
-                    </div>
-                    {isConnected ? (
-                      <Badge variant="success">Connected</Badge>
-                    ) : (
-                      <Badge variant="secondary">Not connected</Badge>
-                    )}
-                  </div>
+            {Object.keys(INTEGRATION_META)
+              .filter((type) => CATALOG_TYPES.includes(type))
+              .map((type, index) => {
+                const integrationMeta = INTEGRATION_META[type];
+                const connected = items.find((item) => item.type === type);
+                const connectedId = connected?.id;
+                const isConnected = !!connectedId && connectedTypes.has(type);
+                const Icon = integrationMeta.icon;
+                if (isConnected && connectedId) {
+                  return (
+                    <motion.div
+                      key={connectedId}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="glass p-6 rounded-xl"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="w-12 h-12 bg-red-600/10 rounded-lg flex items-center justify-center">
+                          <Icon className="w-6 h-6 text-red-500" />
+                        </div>
+                        <Badge variant="success">Connected</Badge>
+                      </div>
 
-                  <h3 className="text-xl font-semibold mb-2">{integrationMeta.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-3">{integrationMeta.description}</p>
-                  <p className="text-xs text-muted-foreground mb-6">
-                    {isConnected
-                      ? item.availability?.configured
-                        ? 'Configured'
-                        : 'Configured'
-                      : item.availability?.configured
-                        ? 'Configured'
-                        : 'Not configured'}
-                  </p>
+                      <h3 className="text-xl font-semibold mb-2">{integrationMeta.name}</h3>
+                      <p className="text-sm text-muted-foreground mb-3">{integrationMeta.description}</p>
 
-                  <div className="flex gap-2 pt-4 border-t border-border">
-                    {isConnected && item.id ? (
-                      <>
+                      <div className="flex gap-2 pt-4 border-t border-border">
                         <button
-                          onClick={() => testMutation.mutate(item.id as string)}
+                          onClick={() => testMutation.mutate(connectedId)}
                           disabled={testMutation.isPending}
                           className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-600/90 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                         >
@@ -236,7 +229,7 @@ export default function IntegrationsPage() {
                         <button
                           onClick={() => {
                             if (window.confirm(`Disconnect ${integrationMeta.name}?`)) {
-                              disconnectMutation.mutate(item.id as string);
+                              disconnectMutation.mutate(connectedId);
                             }
                           }}
                           disabled={disconnectMutation.isPending}
@@ -245,11 +238,32 @@ export default function IntegrationsPage() {
                           <Trash2 className="w-4 h-4" />
                           Disconnect
                         </button>
-                      </>
-                    ) : (
+                      </div>
+                    </motion.div>
+                  );
+                }
+                return (
+                  <motion.div
+                    key={type}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="glass p-6 rounded-xl"
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="w-12 h-12 bg-red-600/10 rounded-lg flex items-center justify-center">
+                        <Icon className="w-6 h-6 text-red-500" />
+                      </div>
+                      <Badge variant="secondary">Not connected</Badge>
+                    </div>
+
+                    <h3 className="text-xl font-semibold mb-2">{integrationMeta.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-6">{integrationMeta.description}</p>
+
+                    <div className="flex gap-2 pt-4 border-t border-border">
                       <button
                         onClick={() => {
-                          setConnectType(item.type);
+                          setConnectType(type);
                           setConfigForm({});
                         }}
                         className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-600/90 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -257,11 +271,10 @@ export default function IntegrationsPage() {
                         <PlugZap className="w-4 h-4" />
                         Connect
                       </button>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })}
+                    </div>
+                  </motion.div>
+                );
+              })}
           </div>
         )}
       </motion.div>

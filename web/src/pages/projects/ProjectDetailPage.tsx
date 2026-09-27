@@ -2,12 +2,14 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { projectsApi } from '../../api';
+import { getErrorMessage, getErrorKind } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
   PageLoader,
   EmptyState,
   StatCard,
   RunStatusBadge,
+  ErrorState,
   Table,
   TableHeader,
   TableBody,
@@ -47,7 +49,7 @@ export default function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: ['project-dashboard', projectId],
     queryFn: () => projectsApi.dashboard(projectId as string),
     enabled: !!projectId,
@@ -86,7 +88,17 @@ export default function ProjectDetailPage() {
 
         {isLoading && <PageLoader label="Loading project..." />}
 
-        {!isLoading && (
+        {!isLoading && isError && (
+          <ErrorState
+            kind={getErrorKind(error)}
+            title="Failed to load project"
+            description={getErrorMessage(error)}
+            onRetry={() => void refetch()}
+            isRetrying={isFetching}
+          />
+        )}
+
+        {!isLoading && !isError && (
           <>
             {/* Stats */}
             {counts && (

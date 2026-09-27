@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { billingApi } from '../../api';
-import { getErrorMessage } from '../../api/client';
-import { PageLoader, Badge } from '../../components/ui';
+import { getErrorMessage, getErrorKind } from '../../api/client';
+import { PageLoader, Badge, ErrorState } from '../../components/ui';
 import { Check, CreditCard, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -16,28 +16,28 @@ interface Plan {
 
 const PLANS: Plan[] = [
   {
-    key: 'free',
+    key: 'FREE',
     name: 'Free',
     price: 0,
     description: 'For individuals getting started',
     features: ['5 test runs/mo', '1 project', 'Community support'],
   },
   {
-    key: 'hobby',
-    name: 'Hobby',
+    key: 'PRO',
+    name: 'Pro',
     price: 29,
     description: 'For small teams',
     features: ['500 test runs/mo', '10 projects', 'Email support'],
   },
   {
-    key: 'team',
-    name: 'Team',
+    key: 'BUSINESS',
+    name: 'Business',
     price: 99,
     description: 'For growing teams',
     features: ['5,000 test runs/mo', 'Unlimited projects', 'Priority support', 'AI agents'],
   },
   {
-    key: 'enterprise',
+    key: 'ENTERPRISE',
     name: 'Enterprise',
     price: 'Custom',
     description: 'For large orgs',
@@ -48,7 +48,7 @@ const PLANS: Plan[] = [
 export default function BillingSettingsPage() {
   const queryClient = useQueryClient();
 
-  const { data: subscription, isLoading: loadingSubscription } = useQuery({
+  const { data: subscription, isLoading: loadingSubscription, isError: subscriptionError, error: subscriptionErr, refetch: refetchSubscription, isFetching: fetchingSubscription } = useQuery({
     queryKey: ['billing'],
     queryFn: () => billingApi.subscription(),
   });
@@ -69,7 +69,7 @@ export default function BillingSettingsPage() {
     },
   });
 
-  const currentPlan = subscription?.plan?.toLowerCase();
+  const currentPlan = subscription?.plan;
   const percent =
     usage && usage.testRunLimit > 0
       ? Math.min(100, Math.round((usage.testRunsUsed / usage.testRunLimit) * 100))
@@ -80,6 +80,20 @@ export default function BillingSettingsPage() {
 
   if (loadingSubscription && !subscription) {
     return <PageLoader label="Loading billing..." />;
+  }
+
+  if (subscriptionError && !subscription) {
+    return (
+      <ErrorState
+        kind={getErrorKind(subscriptionErr)}
+        title="Failed to load billing"
+        description={getErrorMessage(subscriptionErr)}
+        onRetry={() => {
+          void refetchSubscription();
+        }}
+        isRetrying={fetchingSubscription}
+      />
+    );
   }
 
   return (

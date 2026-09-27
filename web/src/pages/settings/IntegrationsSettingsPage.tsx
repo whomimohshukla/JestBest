@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { integrationsApi } from '../../api';
 import { PageLoader, Badge } from '../../components/ui';
-import { Plug, Settings2, ExternalLink } from 'lucide-react';
+import { Plug, Settings2, ExternalLink, RefreshCw } from 'lucide-react';
 import type { Integration } from '../../types';
 
 type IntegrationListItem = Integration & {
@@ -11,7 +11,7 @@ type IntegrationListItem = Integration & {
 };
 
 export default function IntegrationsSettingsPage() {
-  const { data: integrationList, isLoading } = useQuery({
+  const { data: integrationList, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['integrations'],
     queryFn: () => integrationsApi.list(),
   });
@@ -38,11 +38,24 @@ export default function IntegrationsSettingsPage() {
 
         {isLoading && <PageLoader label="Loading integrations..." />}
 
-        {!isLoading && (!integrationList || integrationList.length === 0) && (
+        {!isLoading && isError && (
+          <div className="rounded-xl border border-border bg-secondary/30 p-6 text-center">
+            <p className="text-red-500 font-medium mb-4">Failed to load integrations.</p>
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!isLoading && !isError && (!integrationList || integrationList.length === 0) && (
           <p className="text-sm text-muted-foreground py-6 text-center">No integrations configured yet.</p>
         )}
 
-        {!isLoading && integrationList && integrationList.length > 0 && (
+        {!isLoading && !isError && integrationList && integrationList.length > 0 && (
           <div className="space-y-3">
             {integrationList.map((it, index) => (
               <motion.div

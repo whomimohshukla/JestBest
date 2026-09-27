@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { Bot, Sparkles, CheckCircle2, AlertCircle, Mail, Loader2 } from 'lucide-react';
 import { PageLoader } from '../../components/ui';
 
-type Status = 'verifying' | 'success' | 'error';
+type Status = 'idle' | 'verifying' | 'success' | 'error';
 
 export default function VerifyEmailPage() {
   const [searchParams] = useSearchParams();
@@ -15,7 +15,7 @@ export default function VerifyEmailPage() {
   const token = searchParams.get('token');
   const email = searchParams.get('email') ?? '';
 
-  const [status, setStatus] = useState<Status>(token ? 'verifying' : 'error');
+  const [status, setStatus] = useState<Status>(token ? 'verifying' : email ? 'idle' : 'error');
   const [errorMessage, setErrorMessage] = useState('');
   const [isResending, setIsResending] = useState(false);
   const hasRun = useRef(false);
@@ -24,7 +24,9 @@ export default function VerifyEmailPage() {
     if (!token || hasRun.current) return;
     hasRun.current = true;
 
-    setStatus('verifying');
+    // No setStatus('verifying') here: status already initialises to 'verifying'
+    // when a token is present, and this only runs from the mount effect. Setting
+    // it synchronously in the effect body would cause a cascading render.
     try {
       await authApi.verifyEmail(token);
       setStatus('success');
@@ -34,13 +36,17 @@ export default function VerifyEmailPage() {
     }
   }, [token]);
 
+  // Consuming the emailed link is a one-shot side effect that must run when
+  // this page mounts, so an effect is correct here. verify() only calls setState
+  // after its first `await`, so this does not cause a cascading render.
   useEffect(() => {
-    if (!token) {
-      setErrorMessage('This verification link is invalid or has expired.');
-      return;
-    }
-    verify();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (token) verify();
   }, [token, verify]);
+
+  // The "no token" case is static, so derive it instead of storing it in state.
+  const displayedError =
+    errorMessage || (!token ? 'This verification link is invalid or has expired.' : '');
 
   const handleResend = async () => {
     if (!email) return;
@@ -96,6 +102,48 @@ export default function VerifyEmailPage() {
             <PageLoader label="Verifying your email…" />
           )}
 
+          {status === 'idle' && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center space-y-6"
+            >
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full mx-auto">
+                <Mail className="w-8 h-8 text-red-500" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-semibold mb-2">Check your inbox</h2>
+                <p className="text-muted-foreground text-sm">
+                  We sent a verification link to <span className="text-white font-medium">{email || 'your email'}</span>.
+                  Click it to verify your account, then sign in.
+                </p>
+              </div>
+              <button
+                onClick={handleResend}
+                disabled={isResending}
+                className="w-full py-3 bg-gradient-to-r from-red-600 to-red-600/80 hover:from-red-600/90 hover:to-red-600/70 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isResending ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Resending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4" />
+                    Resend verification email
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => navigate('/auth/login')}
+                className="w-full py-3 border border-white/10 text-muted-foreground hover:text-white rounded-lg transition-all"
+              >
+                Back to sign in
+              </button>
+            </motion.div>
+          )}
+
           {status === 'success' && (
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
@@ -133,7 +181,7 @@ export default function VerifyEmailPage() {
               <div>
                 <h2 className="text-2xl font-semibold mb-2">Verification failed</h2>
                 <p className="text-muted-foreground text-sm">
-                  {errorMessage || 'Something went wrong while verifying your email.'}
+                  {displayedError || 'Something went wrong while verifying your email.'}
                 </p>
               </div>
 

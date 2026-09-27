@@ -9,16 +9,13 @@ import {
   Plus, 
   FolderKanban, 
   Search, 
-  MoreVertical,
   Calendar,
   Activity,
   Loader2,
-  Edit,
-  Trash2,
+  Archive,
   ExternalLink
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import type { Project } from '../../types';
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
@@ -28,7 +25,7 @@ export default function ProjectsPage() {
   const queryClient = useQueryClient();
 
   // Fetch projects
-  const { data: projectList, isLoading } = useQuery({
+  const { data: projectList, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectsApi.list({ pageSize: 100 }),
   });
@@ -116,7 +113,32 @@ export default function ProjectsPage() {
         )}
 
         {/* Empty State */}
-        {!isLoading && (!filteredProjects || filteredProjects.length === 0) && (
+        {!isLoading && isError && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass p-12 rounded-xl text-center"
+          >
+            <div className="w-20 h-20 bg-red-600/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Loader2 className="w-10 h-10 text-red-500" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Failed to load projects</h3>
+            <p className="text-muted-foreground mb-6">
+              We couldn't reach the API. Check your connection and try again.
+            </p>
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="px-6 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors font-medium inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {isFetching ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+              Retry
+            </button>
+          </motion.div>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && !isError && (!filteredProjects || filteredProjects.length === 0) && (
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -142,7 +164,7 @@ export default function ProjectsPage() {
         )}
 
         {/* Projects Grid */}
-        {!isLoading && filteredProjects && filteredProjects.length > 0 && (
+        {!isLoading && !isError && filteredProjects && filteredProjects.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProjects.map((project, index) => (
               <motion.div
@@ -150,15 +172,13 @@ export default function ProjectsPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.1 }}
+                onClick={() => navigate(`/projects/${project.id}`)}
                 className="glass p-6 rounded-xl hover:shadow-lg transition-all cursor-pointer group"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="w-12 h-12 bg-red-600/10 rounded-lg flex items-center justify-center group-hover:bg-red-600/20 transition-colors">
                     <FolderKanban className="w-6 h-6 text-red-500" />
                   </div>
-                  <button className="p-2 hover:bg-secondary rounded-lg transition-colors">
-                    <MoreVertical className="w-5 h-5 text-muted-foreground" />
-                  </button>
                 </div>
 
                 <h3 className="text-xl font-semibold mb-2 group-hover:text-red-500 transition-colors">
@@ -179,7 +199,10 @@ export default function ProjectsPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-2 pt-4 border-t border-border">
+                <div
+                  className="flex gap-2 pt-4 border-t border-border"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Link
                     to={`/projects/${project.id}`}
                     className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-600/90 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -188,20 +211,15 @@ export default function ProjectsPage() {
                     Open
                   </Link>
                   <button
-                    onClick={() => navigate(`/projects/${project.id}`)}
-                    className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button
                     onClick={() => {
                       if (window.confirm(`Archive project "${project.name}"?`)) {
                         archiveProjectMutation.mutate(project.id);
                       }
                     }}
-                    className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors text-red-500"
+                    className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors"
+                    title="Archive project"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Archive className="w-4 h-4" />
                   </button>
                 </div>
               </motion.div>
@@ -210,7 +228,7 @@ export default function ProjectsPage() {
         )}
 
         {/* Stats Footer */}
-        {!isLoading && filteredProjects && filteredProjects.length > 0 && (
+        {!isLoading && !isError && filteredProjects && filteredProjects.length > 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

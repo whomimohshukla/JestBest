@@ -5,7 +5,7 @@ import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { Bot, Mail, Lock, User, Building2, ArrowRight, Sparkles, CheckCircle } from 'lucide-react';
+import { Bot, Mail, Lock, User, Building2, ArrowRight, CheckCircle } from 'lucide-react';
 import { GitHubIcon } from '../../components/ui/social-icons';
 
 export default function RegisterPage() {
@@ -16,6 +16,7 @@ export default function RegisterPage() {
     organizationName: '' 
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
 
@@ -34,6 +35,11 @@ export default function RegisterPage() {
         name: formData.name || undefined,
         organizationName: formData.organizationName || undefined,
       });
+      if ('verificationRequired' in result) {
+        navigate(`/auth/verify-email?email=${encodeURIComponent(formData.email)}`);
+        toast('Account created! Please verify your email to get started.');
+        return;
+      }
       setAuth(result);
       toast.success('Account created successfully! 🎉');
       navigate('/dashboard');
@@ -44,9 +50,16 @@ export default function RegisterPage() {
     }
   };
 
-  const handleGithubLogin = () => {
-    const base = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
-    window.location.href = `${base}/auth/oauth/github/callback`;
+  const handleGithubLogin = async () => {
+    if (oauthLoading) return;
+    setOauthLoading(true);
+    try {
+      const { url } = await authApi.oauthAuthorize('github');
+      window.location.href = url;
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+      setOauthLoading(false);
+    }
   };
 
   const features = [
@@ -117,9 +130,7 @@ export default function RegisterPage() {
             <div className="inline-flex items-center justify-center w-14 h-14 bg-red-600 to-red-600/80 rounded-xl mb-3">
               <Bot className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-3xl font-bold flex items-center justify-center">
-              <Sparkles className="w-5 h-5 text-red-500 animate-pulse" />
-            </h1>
+            <h1 className="text-3xl font-bold">VeriBot</h1>
           </div>
 
           <form onSubmit={handleSubmit} className="glass p-8 rounded-2xl space-y-6 backdrop-blur-xl">
@@ -212,6 +223,25 @@ export default function RegisterPage() {
               )}
             </button>
             
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
+              <div className="relative flex justify-center text-xs"><span className="bg-card px-3 text-muted-foreground">or sign up with</span></div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGithubLogin}
+              disabled={isLoading || oauthLoading}
+              className="w-full py-3 bg-secondary/50 hover:bg-secondary text-sm font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-border"
+            >
+              {oauthLoading ? (
+                <div className="w-4 h-4 border-2 border-red-500/30 border-t-red-500 rounded-full animate-spin" />
+              ) : (
+                <GitHubIcon className="w-4 h-4" />
+              )}
+              {oauthLoading ? 'Redirecting to GitHub…' : 'Continue with GitHub'}
+            </button>
+
             <div className="text-center">
               <p className="text-sm text-muted-foreground">
                 Already have an account?{' '}

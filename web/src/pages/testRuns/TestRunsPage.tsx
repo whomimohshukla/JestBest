@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { testRunsApi, projectsApi, testCasesApi } from '../../api';
@@ -13,32 +13,36 @@ import {
   ListChecks,
   CheckCircle2,
   XCircle,
+  RefreshCw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
-  Badge,
   RunStatusBadge,
+  Select,
   EmptyState,
   PageLoader,
 } from '../../components/ui';
 import type { TestRun, TestCase } from '../../types';
 
-const STATUS_FILTERS = ['ALL', 'PENDING', 'QUEUED', 'RUNNING', 'PASSED', 'FAILED'] as const;
+const STATUS_FILTERS = ['ALL', 'PENDING', 'QUEUED', 'RUNNING', 'PASSED', 'FAILED', 'CANCELLED'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 
 export default function TestRunsPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('projectId') ?? '');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formProjectId, setFormProjectId] = useState('');
   const [selectedTestCaseIds, setSelectedTestCaseIds] = useState<string[]>([]);
 
-  const { data: runList, isLoading } = useQuery({
-    queryKey: ['test-runs', statusFilter],
+  const { data: runList, isLoading, isError, refetch, isFetching } = useQuery({
+    queryKey: ['test-runs', statusFilter, selectedProjectId],
     queryFn: () =>
       testRunsApi.list({
         pageSize: 100,
+        ...(selectedProjectId ? { projectId: selectedProjectId } : {}),
         ...(statusFilter !== 'ALL' ? { status: statusFilter } : {}),
       }),
   });
@@ -130,6 +134,23 @@ export default function TestRunsPage() {
           </button>
         </div>
 
+        {/* Project Filter */}
+        <div className="max-w-sm mb-6">
+          <label className="block text-sm font-medium mb-2">Filter by Project</label>
+          <Select
+            value={selectedProjectId}
+            onChange={(e) => setSelectedProjectId(e.target.value)}
+            className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+          >
+            <option value="">All Projects</option>
+            {(projectList?.items ?? []).map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
         {/* Status Filter Chips */}
         <div className="flex flex-wrap gap-2 mb-8">
           {STATUS_FILTERS.map((status) => (
@@ -150,8 +171,22 @@ export default function TestRunsPage() {
         {/* Loading State */}
         {isLoading && <PageLoader label="Loading test runs..." />}
 
+        {/* Error State */}
+        {!isLoading && isError && (
+          <div className="glass rounded-xl p-8 text-center">
+            <p className="text-red-500 font-medium mb-4">Failed to load test runs.</p>
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Empty State */}
-        {!isLoading && runs.length === 0 && (
+        {!isLoading && !isError && runs.length === 0 && (
           <EmptyState
             icon={ListChecks}
             title="No test runs yet"
@@ -175,7 +210,7 @@ export default function TestRunsPage() {
         )}
 
         {/* Runs List */}
-        {!isLoading && runs.length > 0 && (
+        {!isLoading && !isError && runs.length > 0 && (
           <div className="space-y-4">
             {runs.map((run, index) => (
               <motion.div
@@ -192,7 +227,6 @@ export default function TestRunsPage() {
                         #{run.id.slice(0, 8)}
                       </span>
                       <RunStatusBadge status={run.status} />
-                      <Badge variant="secondary">{run.triggerType}</Badge>
                     </div>
 
                     <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
@@ -260,7 +294,7 @@ export default function TestRunsPage() {
             <form onSubmit={handleCreateRun} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium mb-2">Project *</label>
-                <select
+                <Select
                   value={formProjectId}
                   onChange={(e) => handleSelectProject(e.target.value)}
                   className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -273,7 +307,7 @@ export default function TestRunsPage() {
                       {project.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               {formProjectId && (

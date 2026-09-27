@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiKeysApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { PageLoader } from '../../components/ui';
-import { Copy, KeyRound, Loader2, Plus, Trash2 } from 'lucide-react';
+import { Copy, KeyRound, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ApiKey } from '../../types';
 
@@ -12,9 +12,9 @@ export default function ApiKeysSettingsPage() {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [keyName, setKeyName] = useState('');
-  const [createdKey, setCreatedKey] = useState<ApiKey & { rawKey: string } | null>(null);
+  const [createdKey, setCreatedKey] = useState<ApiKey & { plainKey: string } | null>(null);
 
-  const { data: apiKeys, isLoading } = useQuery({
+  const { data: apiKeys, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['api-keys'],
     queryFn: () => apiKeysApi.list(),
   });
@@ -53,7 +53,7 @@ export default function ApiKeysSettingsPage() {
   const handleCopy = async () => {
     if (!createdKey) return;
     try {
-      await navigator.clipboard.writeText(createdKey.rawKey);
+      await navigator.clipboard.writeText(createdKey.plainKey);
       toast.success('Key copied to clipboard');
     } catch {
       toast.error('Failed to copy key');
@@ -92,7 +92,20 @@ export default function ApiKeysSettingsPage() {
 
       {isLoading && <PageLoader label="Loading API keys..." />}
 
-      {!isLoading && (!apiKeys || apiKeys.length === 0) && (
+      {!isLoading && isError && (
+        <div className="glass rounded-xl p-8 text-center">
+          <p className="text-red-500 font-medium mb-4">Failed to load API keys.</p>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!isLoading && !isError && (!apiKeys || apiKeys.length === 0) && (
         <div className="glass p-12 rounded-xl text-center">
           <div className="w-20 h-20 bg-red-600/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <KeyRound className="w-10 h-10 text-red-500" />
@@ -115,7 +128,7 @@ export default function ApiKeysSettingsPage() {
         </div>
       )}
 
-      {!isLoading && apiKeys && apiKeys.length > 0 && (
+      {!isLoading && !isError && apiKeys && apiKeys.length > 0 && (
         <div className="glass p-6 rounded-xl overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -131,7 +144,7 @@ export default function ApiKeysSettingsPage() {
               {apiKeys.map((key) => (
                 <tr key={key.id} className="border-b border-border/50">
                   <td className="py-3 pr-4 font-medium">{key.name}</td>
-                  <td className="py-3 pr-4 font-mono text-xs">{`${key.key.slice(0, 12)}…`}</td>
+                  <td className="py-3 pr-4 font-mono text-xs">{key.prefix || `${key.key.slice(0, 8)}…`}</td>
                   <td className="py-3 pr-4 text-muted-foreground">
                     {key.lastUsedAt ? new Date(key.lastUsedAt).toLocaleDateString() : 'Never'}
                   </td>
@@ -170,7 +183,7 @@ export default function ApiKeysSettingsPage() {
                 </p>
 
                 <div className="flex items-center gap-2 bg-secondary/50 p-3 rounded-lg">
-                  <code className="flex-1 font-mono text-sm break-all">{createdKey.rawKey}</code>
+                  <code className="flex-1 font-mono text-sm break-all">{createdKey.plainKey}</code>
                   <button
                     onClick={handleCopy}
                     className="flex items-center gap-1.5 px-3 py-2 bg-secondary hover:bg-secondary/80 rounded-lg text-sm font-medium shrink-0"

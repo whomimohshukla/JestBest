@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi, bugsApi } from '../../api';
@@ -8,6 +8,7 @@ import Layout from '../../components/Layout';
 import {
   PageLoader,
   EmptyState,
+  Select,
   SeverityBadge,
   PriorityBadge,
   BugStatusBadge,
@@ -18,7 +19,7 @@ import {
   TableHead,
   TableCell,
 } from '../../components/ui';
-import { Plus, Search, Bug, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Search, Bug, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Bug as BugType, BugSeverity, BugPriority } from '../../types';
 
@@ -26,7 +27,8 @@ const SEVERITIES: BugSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const PRIORITIES: BugPriority[] = ['P0', 'P1', 'P2', 'P3'];
 
 export default function BugsPage() {
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [searchParams] = useSearchParams();
+  const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('projectId') ?? '');
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newBug, setNewBug] = useState<{
@@ -51,7 +53,7 @@ export default function BugsPage() {
   });
 
   // Fetch bugs
-  const { data: bugsData, isLoading } = useQuery({
+  const { data: bugsData, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['bugs', selectedProjectId],
     queryFn: () =>
       bugsApi.list(selectedProjectId ? { projectId: selectedProjectId, pageSize: 100 } : { pageSize: 100 }),
@@ -139,7 +141,7 @@ export default function BugsPage() {
             />
           </div>
 
-          <select
+          <Select
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
             className="w-full md:w-64 px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -150,14 +152,28 @@ export default function BugsPage() {
                 {project.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Loading State */}
         {isLoading && <PageLoader label="Loading bugs..." />}
 
+        {/* Error State */}
+        {!isLoading && isError && (
+          <div className="glass rounded-xl p-8 text-center">
+            <p className="text-red-500 font-medium mb-4">Failed to load bugs.</p>
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Empty State */}
-        {!isLoading && bugs.length === 0 && (
+        {!isLoading && !isError && bugs.length === 0 && (
           <EmptyState
             icon={Bug}
             title={searchQuery ? 'No bugs match your search' : 'No bugs yet'}
@@ -170,7 +186,7 @@ export default function BugsPage() {
         )}
 
         {/* Bugs Table */}
-        {!isLoading && bugs.length > 0 && (
+        {!isLoading && !isError && bugs.length > 0 && (
           <div className="glass p-6 rounded-xl">
             <Table>
               <TableHeader>
@@ -264,7 +280,7 @@ export default function BugsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">Severity</label>
-                  <select
+                  <Select
                     value={newBug.severity}
                     onChange={(e) => setNewBug({ ...newBug, severity: e.target.value as BugSeverity })}
                     className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -275,12 +291,12 @@ export default function BugsPage() {
                         {severity}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">Priority</label>
-                  <select
+                  <Select
                     value={newBug.priority}
                     onChange={(e) => setNewBug({ ...newBug, priority: e.target.value as BugPriority })}
                     className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -291,13 +307,13 @@ export default function BugsPage() {
                         {priority}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">Project</label>
-                <select
+                <Select
                   value={newBug.projectId}
                   onChange={(e) => setNewBug({ ...newBug, projectId: e.target.value })}
                   className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -310,7 +326,7 @@ export default function BugsPage() {
                       {project.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div className="flex gap-3 pt-4">

@@ -4,7 +4,7 @@ import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { Bot, Lock, ArrowRight, Sparkles, AlertCircle, Loader2 } from 'lucide-react';
+import { Bot, Lock, ArrowRight, Sparkles, AlertCircle, Loader2, CheckCircle2, KeyRound } from 'lucide-react';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -14,25 +14,42 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ password?: string; confirmPassword?: string }>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const validate = (): boolean => {
+    const errors: { password?: string; confirmPassword?: string } = {};
+    if (password.length < 8) {
+      errors.password = 'Password must be at least 8 characters long.';
+    } else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+      errors.password = 'Password must contain at least one letter and one number.';
+    }
+    if (!confirmPassword) {
+      errors.confirmPassword = 'Please re-enter your password.';
+    } else if (password !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match.';
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password.length < 8) {
-      toast.error('Password must be at least 8 characters long');
+    toast.dismiss();
+    setError(null);
+    setFieldErrors({});
+    if (!validate()) {
       return;
     }
-    if (password !== confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-
-    setIsLoading(true);
+setIsLoading(true);
     try {
       await authApi.resetPassword(token!, password);
       toast.success('Password reset successful');
       navigate('/auth/login');
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const message = getErrorMessage(error);
+      setError(message);
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -103,26 +120,50 @@ export default function ResetPasswordPage() {
             <div>
               <h2 className="text-2xl font-semibold mb-2">Set a new password</h2>
               <p className="text-muted-foreground text-sm">
-                Choose a strong password for your account (min. 8 characters).
+                Choose a strong password for your account. It must be at least 8 characters and
+                contain letters and numbers.
               </p>
             </div>
+
+            {error && (
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div className="text-sm space-y-1">
+                  <p className="font-medium">{error}</p>
+                  <p className="text-neutral-400">
+                    If your reset link has expired, you can{' '}
+                    <Link to="/auth/forgot-password" className="text-red-400 hover:underline font-medium">
+                      request a new one
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                  <Lock className="w-4 h-4" />
+                  <KeyRound className="w-4 h-4" />
                   New Password
                 </label>
                 <input
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined });
+                  }}
+                  className={`w-full px-4 py-3 bg-secondary/50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all ${fieldErrors.password ? 'border-red-500/60' : 'border-border'}`}
                   placeholder="Min. 8 characters"
                   required
-                  minLength={8}
                   disabled={isLoading}
                 />
+                {fieldErrors.password && (
+                  <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {fieldErrors.password}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -133,20 +174,40 @@ export default function ResetPasswordPage() {
                 <input
                   type="password"
                   value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
+                  onChange={(e) => {
+                    setConfirmPassword(e.target.value);
+                    if (fieldErrors.confirmPassword) setFieldErrors({ ...fieldErrors, confirmPassword: undefined });
+                  }}
+                  className={`w-full px-4 py-3 bg-secondary/50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all ${fieldErrors.confirmPassword ? 'border-red-500/60' : 'border-border'}`}
                   placeholder="Re-enter your password"
                   required
-                  minLength={8}
                   disabled={isLoading}
                 />
+                {fieldErrors.confirmPassword && (
+                  <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" /> {fieldErrors.confirmPassword}
+                  </p>
+                )}
+              </div>
+
+              {/* Password strength hints */}
+              <div className="flex flex-wrap gap-3 text-xs">
+                <span className={`flex items-center gap-1 ${password.length >= 8 ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                  <CheckCircle2 className="w-3 h-3" /> 8+ characters
+                </span>
+                <span className={`flex items-center gap-1 ${/[A-Za-z]/.test(password) ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                  <CheckCircle2 className="w-3 h-3" /> Letter
+                </span>
+                <span className={`flex items-center gap-1 ${/\d/.test(password) ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                  <CheckCircle2 className="w-3 h-3" /> Number
+                </span>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3  from-red-600 to-red-600/80 hover:from-red-600/90 hover:to-red-600/70 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
+              className="w-full py-3 from-red-600 to-red-600/80 hover:from-red-600/90 hover:to-red-600/70 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group"
             >
               {isLoading ? (
                 <>

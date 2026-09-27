@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhooksApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { PageLoader, Badge } from '../../components/ui';
-import { ChevronDown, Loader2, Plus, Trash2, Webhook as WebhookIcon, Zap } from 'lucide-react';
+import { ChevronDown, Loader2, Plus, RefreshCw, Trash2, Webhook as WebhookIcon, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Webhook, WebhookDelivery } from '../../types';
 
@@ -17,9 +17,9 @@ function WebhookDeliveries({ webhookId }: { webhookId: string }) {
   });
 
   const statusColor = (status: WebhookDelivery['status']) => {
-    if (status === 'SUCCESS') return 'bg-red-500/15 text-red-400';
+    if (status === 'SUCCESS') return 'bg-emerald-500/15 text-emerald-400';
     if (status === 'FAILED') return 'bg-red-500/15 text-red-400';
-    return 'bg-red-500/15 text-red-400';
+    return 'bg-yellow-500/15 text-yellow-400';
   };
 
   return (
@@ -71,7 +71,7 @@ export default function WebhooksSettingsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState({ url: '', secret: '', events: [] as string[] });
 
-  const { data: webhooks, isLoading } = useQuery({
+  const { data: webhooks, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['webhooks'],
     queryFn: () => webhooksApi.list(),
   });
@@ -172,7 +172,20 @@ export default function WebhooksSettingsPage() {
 
       {isLoading && <PageLoader label="Loading webhooks..." />}
 
-      {!isLoading && (!webhooks || webhooks.length === 0) && (
+      {!isLoading && isError && (
+        <div className="glass rounded-xl p-8 text-center">
+          <p className="text-red-500 font-medium mb-4">Failed to load webhooks.</p>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Retry
+          </button>
+        </div>
+      )}
+
+      {!isLoading && !isError && (!webhooks || webhooks.length === 0) && (
         <div className="glass p-12 rounded-xl text-center">
           <div className="w-20 h-20 bg-red-600/10 rounded-full flex items-center justify-center mx-auto mb-4">
             <WebhookIcon className="w-10 h-10 text-red-500" />
@@ -191,7 +204,7 @@ export default function WebhooksSettingsPage() {
         </div>
       )}
 
-      {!isLoading && webhooks && webhooks.length > 0 && (
+      {!isLoading && !isError && webhooks && webhooks.length > 0 && (
         <div className="space-y-4">
           {webhooks.map((webhook, index) => (
             <motion.div

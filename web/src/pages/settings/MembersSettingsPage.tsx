@@ -4,8 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
-import { PageLoader } from '../../components/ui';
-import { Loader2, Mail, Trash2, Users } from 'lucide-react';
+import { PageLoader, Select } from '../../components/ui';
+import { Loader2, Mail, RefreshCw, Trash2, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Membership, MembershipRole } from '../../types';
 
@@ -21,7 +21,7 @@ export default function MembersSettingsPage() {
     role: 'DEVELOPER',
   });
 
-  const { data: members, isLoading } = useQuery({
+  const { data: members, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['org-members', orgId],
     queryFn: () => organizationApi.members(orgId as string),
     enabled: Boolean(orgId),
@@ -112,7 +112,7 @@ export default function MembersSettingsPage() {
             disabled={inviteMutation.isPending}
             required
           />
-          <select
+          <Select
             value={invite.role}
             onChange={(e) => setInvite({ ...invite, role: e.target.value as MembershipRole })}
             className="w-full md:w-56 px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -123,7 +123,7 @@ export default function MembersSettingsPage() {
                 {role}
               </option>
             ))}
-          </select>
+          </Select>
           <button
             type="submit"
             disabled={inviteMutation.isPending}
@@ -154,11 +154,24 @@ export default function MembersSettingsPage() {
 
         {isLoading && <PageLoader label="Loading members..." />}
 
-        {!isLoading && (!members || members.length === 0) && (
+        {!isLoading && isError && (
+          <div className="rounded-xl border border-border bg-secondary/30 p-6 text-center">
+            <p className="text-red-500 font-medium mb-4">Failed to load members.</p>
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!isLoading && !isError && (!members || members.length === 0) && (
           <p className="text-sm text-muted-foreground py-6 text-center">No members yet.</p>
         )}
 
-        {!isLoading && members && members.length > 0 && (
+        {!isLoading && !isError && members && members.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -184,7 +197,7 @@ export default function MembersSettingsPage() {
                               className="w-8 h-8 rounded-full object-cover"
                             />
                           ) : (
-                            <div className="w-8 h-8 rounded-full  from-red-600 to-red-700 flex items-center justify-center text-xs font-semibold text-white">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-red-600 to-red-700 flex items-center justify-center text-xs font-semibold text-white">
                               {(member.user?.name ?? member.user?.email ?? '?')[0]?.toUpperCase()}
                             </div>
                           )}
@@ -196,7 +209,7 @@ export default function MembersSettingsPage() {
                       </td>
                       <td className="py-3 pr-4 text-muted-foreground">{member.user?.email ?? '—'}</td>
                       <td className="py-3 pr-4">
-                        <select
+                        <Select
                           value={member.role}
                           onChange={(e) => handleRoleChange(member, e.target.value as MembershipRole)}
                           className="px-3 py-2 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 text-sm"
@@ -206,7 +219,7 @@ export default function MembersSettingsPage() {
                               {role}
                             </option>
                           ))}
-                        </select>
+                        </Select>
                       </td>
                       <td className="py-3 pr-4 text-muted-foreground">
                         {new Date(member.joinedAt).toLocaleDateString()}

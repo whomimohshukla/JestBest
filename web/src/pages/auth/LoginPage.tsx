@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../api';
-import { getErrorMessage } from '../../api/client';
+import { getErrorMessage, getErrorCode } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { Bot, Lock, Mail, ArrowRight, Sparkles, Zap, Bug, GitBranch, Database, CheckCircle2 } from 'lucide-react';
-import { GitHubIcon, GoogleIcon } from '../../components/ui/social-icons';
+import { Bot, Lock, Mail, ArrowRight, Zap, Bug, GitBranch, Database, CheckCircle2, AlertCircle } from 'lucide-react';
+import { GitHubIcon } from '../../components/ui/social-icons';
 
 const explainNodes = [
   { icon: Zap, label: 'Agent scans your app', note: 'discovers flows & edge cases', top: '4%', left: '2%' },
@@ -18,31 +18,105 @@ const explainNodes = [
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [twoFactorToken, setTwoFactorToken] = useState<string | null>(null);
+  const [twoFactorSetup, setTwoFactorSetup] = useState<{ secret: string; otpauthUrl: string; qrDataUrl: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string; code?: string }>({});
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
 
+  const validate = (): boolean => {
+    const errors: { email?: string; password?: string; code?: string } = {};
+    if (!email.trim()) {
+      errors.email = 'Please enter your email address.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errors.email = 'Please enter a valid email address.';
+    }
+    if (!password) {
+      errors.password = 'Please enter your password.';
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    toast.dismiss();
+    setError(null);
+    setFieldErrors({});
+    if (!validate()) {
+      return;
+    }
     setIsLoading(true);
     try {
-      const result = await authApi.login(email, password);
+      const result = await authApi.login(email.trim(), password);
+      if ('verificationRequired' in result) {
+        navigate(`/auth/verify-email?email=${encodeURIComponent(email.trim())}`);
+        toast('Please verify your email to continue. Check your inbox for the verification link.');
+        setPassword('');
+        return;
+      }
+      if ('requiresTwoFactor' in result) {
+        setTwoFactorToken(result.twoFactorToken);
+        setTwoFactorSetup(result.setup ?? null);
+        setPassword('');
+        return;
+      }
       setAuth(result);
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const code = getErrorCode(error);
+      const message = getErrorMessage(error);
+      setError(message);
+      setPassword('');
+      if (code === 'RATE_LIMITED') {
+        toast.error('Too many attempts. Please wait a few minutes before trying again.');
+      } else {
+        toast.error(message);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTwoFactorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    toast.dismiss();
+    setError(null);
+    setFieldErrors({});
+    if (!code.trim()) {
+      setFieldErrors({ code: 'Please enter your 6-digit code.' });
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const result = await authApi.verify2fa(twoFactorToken!, code.trim());
+      setAuth(result);
+      toast.success('Welcome back!');
+      navigate('/dashboard');
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setError(message);
+      setCode('');
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleGithubLogin = async () => {
+    if (oauthLoading) return;
+    setOauthLoading(true);
     try {
       const { url } = await authApi.oauthAuthorize('github');
       window.location.href = url;
     } catch (error) {
       toast.error(getErrorMessage(error));
+      setOauthLoading(false);
     }
   };
 
@@ -121,34 +195,115 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                <Mail className="w-4 h-4" /> Email Address
-              </label>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                placeholder="you@example.com" required disabled={isLoading} />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-2 flex items-center gap-2">
-                <Lock className="w-4 h-4" /> Password
-              </label>
-              <div className="relative">
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-                  placeholder="your password" required disabled={isLoading} />
-                <Link to="/auth/forgot-password" className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400 hover:text-white">
-                  Forgot?
-                </Link>
+          <form onSubmit={twoFactorToken ? handleTwoFactorSubmit : handleSubmit} className="space-y-5">
+            {error && (
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
+                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+                <div className="text-sm space-y-1">
+                  <p className="font-medium">{error}</p>
+                  <p className="text-neutral-400">
+                    Forgot your password?{' '}
+                    <Link to="/auth/forgot-password" className="text-red-400 hover:underline font-medium">
+                      Reset it here
+                    </Link>
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
+
+            {twoFactorToken ? (
+              <>
+                {twoFactorSetup ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3 rounded-lg bg-amber-500/10 border border-amber-500/30 p-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-amber-500/20">
+                        <Lock className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Two-factor setup required</p>
+                        <p className="text-xs text-neutral-400">
+                          Your organization requires two-factor authentication. Scan the QR code and enter the code to continue.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-center rounded-lg border border-white/10 bg-white p-3">
+                      <img src={twoFactorSetup.qrDataUrl} alt="TOTP QR code" className="w-44 h-44 object-contain" />
+                    </div>
+                    <p className="text-xs text-neutral-500 text-center">
+                      Can't scan? Use setup code{' '}
+                      <code className="font-mono text-red-400">{twoFactorSetup.secret}</code>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 rounded-lg bg-white/5 border border-white/10 p-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600/20">
+                      <Lock className="w-4 h-4 text-red-500" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Two-factor authentication</p>
+                      <p className="text-xs text-neutral-400">Enter the 6-digit code from your authenticator app</p>
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                    <Lock className="w-4 h-4" /> Authentication Code
+                  </label>
+                  <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code}
+                    onChange={(e) => { setCode(e.target.value.replace(/\D/g, '')); if (fieldErrors.code) setFieldErrors({ ...fieldErrors, code: undefined }); }}
+                    className={`w-full px-4 py-3 bg-white/5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-center text-2xl tracking-[0.5em] ${fieldErrors.code ? 'border-red-500/60' : 'border-white/10'}`}
+                    placeholder="······" required disabled={isLoading} />
+                  {fieldErrors.code && (
+                    <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {fieldErrors.code}
+                    </p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                    <Mail className="w-4 h-4" /> Email Address
+                  </label>
+                  <input type="email" value={email} onChange={(e) => { setEmail(e.target.value); if (fieldErrors.email) setFieldErrors({ ...fieldErrors, email: undefined }); }}
+                    className={`w-full px-4 py-3 bg-white/5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all ${fieldErrors.email ? 'border-red-500/60' : 'border-white/10'}`}
+                    placeholder="you@example.com" required disabled={isLoading} />
+                  {fieldErrors.email && (
+                    <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {fieldErrors.email}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+                    <Lock className="w-4 h-4" /> Password
+                  </label>
+                  <div className="relative">
+                    <input type="password" value={password} onChange={(e) => { setPassword(e.target.value); if (fieldErrors.password) setFieldErrors({ ...fieldErrors, password: undefined }); }}
+                      className={`w-full px-4 py-3 bg-white/5 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all ${fieldErrors.password ? 'border-red-500/60' : 'border-white/10'}`}
+                      placeholder="your password" required disabled={isLoading} />
+                    <Link to="/auth/forgot-password" className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-neutral-400 hover:text-white">
+                      Forgot?
+                    </Link>
+                  </div>
+                  {fieldErrors.password && (
+                    <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" /> {fieldErrors.password}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             <button type="submit" disabled={isLoading}
               className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group">
               {isLoading ? (<>
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Signing in...
+                Verifying...
+              </>) : twoFactorToken ? (<>
+                Verify Code
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </>) : (<>
                 Sign In
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -156,19 +311,27 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {twoFactorToken && (
+            <button type="button" onClick={() => { setTwoFactorToken(null); setTwoFactorSetup(null); setCode(''); setError(null); }}
+              className="mt-4 w-full text-center text-sm text-neutral-400 hover:text-white transition-colors">
+              ← Use a different account
+            </button>
+          )}
+
           <div className="relative my-6">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
             <div className="relative flex justify-center text-xs"><span className="bg-black px-3 text-neutral-400">or continue with</span></div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <button type="button" onClick={handleGithubLogin} disabled={isLoading}
-              className="flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-medium transition-colors border border-white/10">
-              <GitHubIcon className="w-4 h-4" /> GitHub
-            </button>
-            <button type="button" disabled title="Google OAuth coming soon"
-              className="flex items-center justify-center gap-2 py-2.5 bg-white/5 rounded-lg text-sm font-medium border border-white/10 opacity-60 cursor-not-allowed">
-              <GoogleIcon className="w-4 h-4" /> Google
+          <div className="grid grid-cols-1 gap-3">
+            <button type="button" onClick={handleGithubLogin} disabled={isLoading || oauthLoading}
+              className="flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-medium transition-colors border border-white/10 disabled:opacity-50">
+              {oauthLoading ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <GitHubIcon className="w-4 h-4" />
+              )}
+              Sign in with GitHub
             </button>
           </div>
 

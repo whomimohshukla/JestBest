@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { bugsApi, type BugComment } from '../../api';
+import { bugsApi, organizationApi, type BugComment } from '../../api';
 import { getErrorMessage } from '../../api/client';
+import { useAuthStore } from '../../store/authStore';
 import Layout from '../../components/Layout';
 import {
   PageLoader,
   EmptyState,
+  Select,
   BugStatusBadge,
   SeverityBadge,
   PriorityBadge,
@@ -22,6 +24,9 @@ import {
   Bug,
   Loader2,
   Calendar,
+  RefreshCw,
+  GitBranch,
+  ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { BugStatus } from '../../types';
@@ -45,8 +50,9 @@ export default function BugDetailPage() {
   const navigate = useNavigate();
   const [comment, setComment] = useState('');
   const queryClient = useQueryClient();
+  const orgId = useAuthStore((s) => s.organization?.id);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['bug', bugId],
     queryFn: () => bugsApi.get(bugId as string),
     enabled: !!bugId,
@@ -56,6 +62,12 @@ export default function BugDetailPage() {
     queryKey: ['bug-comments', bugId],
     queryFn: () => bugsApi.comments(bugId as string),
     enabled: !!bugId,
+  });
+
+  const { data: membersData } = useQuery({
+    queryKey: ['org-members', orgId],
+    queryFn: () => organizationApi.members(orgId as string),
+    enabled: Boolean(orgId),
   });
 
   const comments = commentsData?.items ?? [];
@@ -77,6 +89,18 @@ export default function BugDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['bug', bugId] });
       queryClient.invalidateQueries({ queryKey: ['bugs'] });
       toast.success('Bug status updated');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: (assigneeId: string | null) => bugsApi.assign(bugId as string, assigneeId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bug', bugId] });
+      queryClient.invalidateQueries({ queryKey: ['bugs'] });
+      toast.success('Assignee updated');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -108,10 +132,40 @@ export default function BugDetailPage() {
     }
   };
 
+  const raiseGithubMutation = useMutation({
+    mutationFn: () => bugsApi.raiseOnGithub(bugId as string),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['bug', bugId], updated);
+      queryClient.invalidateQueries({ queryKey: ['bug', bugId] });
+      queryClient.invalidateQueries({ queryKey: ['bugs'] });
+      toast.success('Bug reported to GitHub');
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error));
+    },
+  });
+
   if (isLoading) {
     return (
       <Layout>
         <PageLoader label="Loading bug..." />
+      </Layout>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Layout>
+        <div className="glass rounded-xl p-8 text-center">
+          <p className="text-red-500 font-medium mb-4">Failed to load bug details.</p>
+          <button
+            onClick={() => refetch()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+          >
+            <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Retry
+          </button>
+        </div>
       </Layout>
     );
   }
@@ -148,6 +202,32 @@ export default function BugDetailPage() {
               <h1 className="text-4xl font-bold gradient-text">{bug.title}</h1>
             </div>
           </div>
+          {bug.githubIssueUrl ? (
+            <a
+              href={bug.githubIssueUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-foreground/5 hover:bg-foreground/10 text-foreground border border-white/10"
+            >
+              <GitBranch className="w-4 h-4" />
+              GitHub Issue
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : (
+            <button
+              onClick={() => raiseGithubMutation.mutate()}
+              disabled={raiseGithubMutation.isPending}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors bg-foreground/5 hover:bg-foreground/10 text-foreground border border-white/10 disabled:opacity-50"
+              title="Report this bug as a GitHub issue in your connected repository"
+            >
+              {raiseGithubMutation.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <GitBranch className="w-4 h-4" />
+              )}
+              Report on GitHub
+            </button>
+          )}
           <button
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
@@ -266,7 +346,21 @@ export default function BugDetailPage() {
               <InfoRow
                 icon={User}
                 label="Assignee"
-                value={bug.assignee?.name ?? 'Unassigned'}
+                value={
+                  <Select
+                    value={bug.assignee?.id ?? ''}
+                    onChange={(e) => assignMutation.mutate(e.target.value === '' ? null : e.target.value)}
+                    disabled={assignMutation.isPending}
+                    className="w-full px-3 py-2 bg-secondary/50 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+                  >
+                    <option value="">Unassigned</option>
+                    {(membersData ?? []).map((member) => (
+                      <option key={member.userId} value={member.userId}>
+                        {member.user?.name || member.user?.email || member.userId.slice(0, 8)}
+                      </option>
+                    ))}
+                  </Select>
+                }
               />
               <InfoRow
                 icon={Calendar}

@@ -8,30 +8,38 @@ import {
   Bug,
   FolderKanban,
   ArrowRight,
-  Loader2,
   AlertTriangle,
   ShieldAlert,
   PlaySquare,
   Plus,
+  RefreshCcw,
 } from 'lucide-react';
 import { analyticsApi, projectsApi } from '../../api';
-import { PageHeader, StatCard, PageLoader, EmptyState, RunStatusBadge, Badge, Skeleton } from '../../components/ui';
-import type { Project, TestRun } from '../../types';
+import { PageHeader, StatCard, PageLoader, EmptyState, RunStatusBadge, Badge } from '../../components/ui';
+import toast from 'react-hot-toast';
+import { getErrorMessage } from '../../api/client';
+import type { Project, TestRun, DashboardAnalytics } from '../../types';
 
 export default function DashboardPage() {
-  const { data: dash, isLoading } = useQuery({
+  const {
+    data: dash,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery<DashboardAnalytics>({
     queryKey: ['dashboard-analytics'],
-    queryFn: () => analyticsApi.dashboard(),
+    queryFn: () => analyticsApi.dashboard() as Promise<DashboardAnalytics>,
   });
 
-  const { data: projects } = useQuery({
+  const { data: projects } = useQuery<{ items: Project[] }>({
     queryKey: ['projects', 'dashboard'],
-    queryFn: () => projectsApi.list({ pageSize: 6 }),
+    queryFn: () => projectsApi.list({ pageSize: 200 }) as Promise<{ items: Project[] }>,
     enabled: !isLoading,
   });
 
-  const recentRuns = (dash?.recentRuns as TestRun[]) ?? [];
-  const projectList = projects?.items ?? [];
+  const recentRuns: TestRun[] = dash?.recentRuns ?? [];
+  const projectList: Project[] = projects?.items ?? [];
 
   const stats = [
     {
@@ -43,8 +51,8 @@ export default function DashboardPage() {
     },
     {
       label: 'Passing Run Rate',
-      value: dash?.recentRuns?.length
-        ? `${Math.round((dash.recentRuns.filter((r: TestRun) => r.status === 'PASSED').length / dash.recentRuns.length) * 100)}%`
+      value: recentRuns.length
+        ? `${Math.round((recentRuns.filter((r) => r.status === 'PASSED').length / recentRuns.length) * 100)}%`
         : '—',
       icon: CheckCircle2,
       accent: 'success' as const,
@@ -59,12 +67,21 @@ export default function DashboardPage() {
     },
     {
       label: 'Active Projects',
-      value: projectList.filter((p: Project) => !p.archivedAt).length,
+      value: projectList.filter((p) => !p.archivedAt).length,
       icon: FolderKanban,
       accent: 'default' as const,
       href: '/projects',
     },
   ];
+
+  const handleRefresh = async () => {
+    try {
+      await refetch();
+      toast.success('Dashboard refreshed');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
+  };
 
   return (
     <Layout>
@@ -72,18 +89,45 @@ export default function DashboardPage() {
         title="Dashboard"
         description="Welcome back! Here's what's happening across your QA."
         actions={
-          <Link
-            to="/tests"
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-red-500-foreground shadow-lg shadow-primary/25 hover:bg-red-600/90 transition-colors"
-          >
-            <Plus className="h-4 w-4" />
-            New Test Case
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleRefresh}
+              disabled={isFetching}
+              className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary transition-colors disabled:opacity-50"
+            >
+              <RefreshCcw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            <Link
+              to="/tests"
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-destructive-foreground shadow-lg shadow-primary/25 hover:bg-red-600/90 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              New Test Case
+            </Link>
+          </div>
         }
       />
 
       {isLoading ? (
         <PageLoader label="Loading dashboard…" />
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border bg-card/50 px-6 py-20 text-center">
+          <AlertTriangle className="h-10 w-10 text-amber-500" />
+          <div>
+            <h3 className="text-lg font-semibold">Failed to load dashboard</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              We couldn't reach the API. Make sure the backend is running and try again.
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 transition-colors"
+          >
+            <RefreshCcw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Try again
+          </button>
+        </div>
       ) : (
         <motion.div
           initial={{ opacity: 0 }}
@@ -119,7 +163,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                         <div
-                          className="h-full rounded-full  from-red-600 to-red-700 transition-all"
+                          className="h-full rounded-full bg-gradient-to-r from-red-600 to-red-700 transition-all"
                           style={{ width: `${Math.min(100, item.value)}%` }}
                         />
                       </div>
@@ -133,7 +177,7 @@ export default function DashboardPage() {
               <div className="rounded-xl border border-border bg-card p-6">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-muted-foreground">Release Risk</h3>
-                  <Badge variant={dash.risk.riskLevel === 'LOW' ? 'success' : dash.risk.riskLevel === 'MEDIUM' ? 'info' : 'warning'}>
+                  <Badge variant={dash.risk.riskLevel === 'LOW' ? 'success' : dash.risk.riskLevel === 'MEDIUM' ? 'warning' : 'destructive'}>
                     {dash.risk.riskLevel}
                   </Badge>
                 </div>
@@ -143,15 +187,13 @@ export default function DashboardPage() {
                     <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary">
                       <div
                         className={`h-full rounded-full transition-all ${
-                          dash.risk.riskLevel === 'CRITICAL'
+                          dash.risk.riskLevel === 'CRITICAL' || dash.risk.riskLevel === 'HIGH'
                             ? 'bg-red-500'
-                            : dash.risk.riskLevel === 'HIGH'
-                              ? 'bg-red-500'
-                              : dash.risk.riskLevel === 'MEDIUM'
-                                ? 'bg-yellow-400'
-                                : 'bg-red-500'
+                            : dash.risk.riskLevel === 'MEDIUM'
+                              ? 'bg-yellow-400'
+                              : 'bg-emerald-500'
                         }`}
-                        style={{ width: `${dash.risk.riskScore}%` }}
+                        style={{ width: `${Math.min(100, dash.risk.riskScore)}%` }}
                       />
                     </div>
                   </div>
@@ -210,7 +252,7 @@ export default function DashboardPage() {
                   title="No test runs yet"
                   description="Create a test case and run it to see results here."
                   action={
-                    <Link to="/tests" className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-red-500-foreground hover:bg-red-600/90">
+                    <Link to="/tests" className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-destructive-foreground hover:bg-red-600/90">
                       <Plus className="h-4 w-4" /> Create test case
                     </Link>
                   }
@@ -227,7 +269,7 @@ export default function DashboardPage() {
                         <div
                           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                             run.status === 'PASSED'
-                              ? 'bg-red-500/10 text-red-400'
+                              ? 'bg-emerald-500/10 text-emerald-500'
                               : run.status === 'FAILED'
                                 ? 'bg-red-500/10 text-red-400'
                                 : 'bg-secondary text-muted-foreground'
@@ -275,7 +317,7 @@ export default function DashboardPage() {
                   title="No projects yet"
                   description="Create your first project to start automating tests."
                   action={
-                    <Link to="/projects" className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-red-500-foreground hover:bg-red-600/90">
+                    <Link to="/projects" className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-destructive-foreground hover:bg-red-600/90">
                       <Plus className="h-4 w-4" /> New project
                     </Link>
                   }
@@ -308,7 +350,7 @@ export default function DashboardPage() {
               <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-400" />
               <div>
                 <p className="font-medium text-red-400">
-                  {dash.openBugs} open bug{dash.openBugs === 1 ? '' : 's'} require attention
+                  {dash?.openBugs} open bug{dash?.openBugs === 1 ? '' : 's'} require attention
                 </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   High-quality releases start with resolving known issues. Review the open bugs in your projects.

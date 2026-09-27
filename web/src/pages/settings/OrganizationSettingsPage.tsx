@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import { PageLoader } from '../../components/ui';
-import { Building2, Loader2 } from 'lucide-react';
+import { Building2, Loader2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function OrganizationSettingsPage() {
@@ -13,7 +13,7 @@ export default function OrganizationSettingsPage() {
   const updateOrganization = useAuthStore((s) => s.updateOrganization);
   const queryClient = useQueryClient();
 
-  const { data: org, isLoading } = useQuery({
+  const { data: org, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['org', orgId],
     queryFn: () => organizationApi.get(orgId as string),
     enabled: Boolean(orgId),
@@ -22,12 +22,13 @@ export default function OrganizationSettingsPage() {
   const [form, setForm] = useState({ name: '', logo: '' });
   const [formInitialized, setFormInitialized] = useState(false);
 
-  useEffect(() => {
-    if (org && !formInitialized) {
-      setForm({ name: org.name ?? '', logo: org.logo ?? '' });
-      setFormInitialized(true);
-    }
-  }, [org, formInitialized]);
+  // Seed the form from the server response during render rather than in an
+  // effect: an effect would commit one frame with the empty defaults and cause
+  // a cascading render.
+  if (org && !formInitialized) {
+    setForm({ name: org.name ?? '', logo: org.logo ?? '' });
+    setFormInitialized(true);
+  }
 
   const updateOrgMutation = useMutation({
     mutationFn: (data: { name: string; logo: string }) =>
@@ -49,6 +50,21 @@ export default function OrganizationSettingsPage() {
 
   if (isLoading && !org) {
     return <PageLoader label="Loading organization..." />;
+  }
+
+  if (isError && !org) {
+    return (
+      <div className="glass rounded-xl p-8 text-center">
+        <p className="text-red-500 font-medium mb-4">Failed to load your organization.</p>
+        <button
+          onClick={() => refetch()}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+        >
+          <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+          Retry
+        </button>
+      </div>
+    );
   }
 
   return (

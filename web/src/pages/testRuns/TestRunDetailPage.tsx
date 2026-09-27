@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
-  Badge,
   StatCard,
   PageHeader,
   PageLoader,
@@ -30,10 +29,10 @@ import {
 import type { TestRun, TestResult } from '../../types';
 
 const RESULT_STATUS_COLORS: Record<string, string> = {
-  PASSED: 'text-red-400 bg-red-500/10 border-emerald-500/20',
+  PASSED: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
   FAILED: 'text-red-400 bg-red-500/10 border-red-500/20',
   SKIPPED: 'text-gray-400 bg-gray-500/10 border-gray-500/20',
-  PENDING: 'text-red-400 bg-red-500/10 border-amber-500/20',
+  PENDING: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
 };
 
 const formatDuration = (duration: number | null | undefined): string => {
@@ -46,7 +45,7 @@ export default function TestRunDetailPage() {
   const { runId } = useParams<{ runId: string }>();
   const queryClient = useQueryClient();
 
-  const { data: run, isLoading } = useQuery({
+  const { data: run, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['test-run', runId],
     queryFn: () => testRunsApi.get(runId as string),
     enabled: !!runId,
@@ -84,11 +83,24 @@ export default function TestRunDetailPage() {
 
         {isLoading && <PageLoader label="Loading run details..." />}
 
-        {!isLoading && run && (
+        {!isLoading && isError && (
+          <div className="glass rounded-xl p-8 text-center">
+            <p className="text-red-500 font-medium mb-4">Failed to load test run details.</p>
+            <button
+              onClick={() => refetch()}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm font-medium"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!isLoading && !isError && run && (
           <>
             <PageHeader
               title={`Run #${run.id.slice(0, 8)}`}
-              description={`Trigerred ${new Date(run.createdAt).toLocaleString()}`}
+              description={`Triggered ${new Date(run.createdAt).toLocaleString()}`}
               actions={
                 <>
                   <button
@@ -121,7 +133,6 @@ export default function TestRunDetailPage() {
 
             <div className="flex items-center gap-3 mb-8">
               <RunStatusBadge status={run.status} />
-              <Badge variant="secondary">{run.triggerType}</Badge>
             </div>
 
             {/* Stat Cards */}
@@ -133,7 +144,7 @@ export default function TestRunDetailPage() {
               <StatCard label="Duration" value={formatDuration(run.duration)} />
               <StatCard
                 label="Completed"
-                value={run.completedAt ? new Date(run.completedAt).toLocaleString() : '—'}
+                value={run.executionCompletedAt ? new Date(run.executionCompletedAt).toLocaleString() : '—'}
               />
             </div>
 
