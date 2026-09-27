@@ -1,6 +1,6 @@
-# VeriBot Frontend
+# JestBest Frontend
 
-Modern, responsive React web application for VeriBot AI-Powered QA Automation Platform.
+Modern, responsive React web application for JestBest AI-Powered QA Automation Platform.
 
 ## 🎨 Tech Stack
 
@@ -250,7 +250,7 @@ MIT
 
 ## 👥 Contributors
 
-VeriBot Team
+JestBest Team
 
 ---
 

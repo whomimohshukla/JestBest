@@ -20,7 +20,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('VeriBot UI crash:', error, info.componentStack);
+    console.error('JestBest UI crash:', error, info.componentStack);
   }
 
   private handleReset = () => {

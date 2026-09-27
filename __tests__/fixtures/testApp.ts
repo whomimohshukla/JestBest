@@ -101,7 +101,7 @@ let sequence = 0;
 
 export const uniqueEmail = (label = 'user'): string => {
   sequence += 1;
-  return `${label}.${Date.now()}.${sequence}@veribot.test`;
+  return `${label}.${Date.now()}.${sequence}@jestbest.test`;
 };
 
 export const TEST_PASSWORD = 'SuperSecret123!';

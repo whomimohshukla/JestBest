@@ -1,11 +1,11 @@
-# VeriBot
+# JestBest
 
-VeriBot is an AI-powered QA platform. Point it at a web application and it crawls
+JestBest is an AI-powered QA platform. Point it at a web application and it crawls
 the app, generates test cases, executes them in a real browser (Playwright),
 analyses failures, files bugs, and reports quality trends.
 
 **The product idea:** turn an untested web app into a continuously verified,
-regression-safe product. VeriBot discovers pages and flows, generates and runs E2E
+regression-safe product. JestBest discovers pages and flows, generates and runs E2E
 tests, hunts flaky behaviour with AI root-cause analysis backed by a self-accumulating
 pgvector knowledge base, and files bugs into GitHub/Jira.
 
@@ -17,6 +17,7 @@ pgvector knowledge base, and files bugs into GitHub/Jira.
 - [Quick start](#quick-start)
 - [Running without Docker](#running-without-docker)
 - [Environment variables](#environment-variables)
+- [Branding](#branding)
 - [Architecture](#architecture)
 - [Request lifecycle](#request-lifecycle)
 - [Project layout](#project-layout)
@@ -86,12 +87,12 @@ is needed for local development.
 `start-dev.sh` requires a running Docker daemon. If you have Postgres and Redis
 installed natively, skip it and run the two dev servers directly.
 
-The API needs a `veribot_test` database in addition to `veribot` before you can
+The API needs a `jestbest_test` database in addition to `jestbest` before you can
 run the test suite:
 
 ```bash
-createdb veribot
-createdb veribot_test
+createdb jestbest
+createdb jestbest_test
 ```
 
 Then set `DATABASE_URL` for the app and `TEST_DATABASE_URL` for Jest. Without
@@ -139,6 +140,39 @@ start** if a required variable is missing, so a typo fails loudly instead of at
 | `RATE_LIMIT_MAX` | `100` | general API limiter |
 | `RATE_LIMIT_AUTH_WINDOW_MS` | `900000` (15 min) | auth routes |
 | `RATE_LIMIT_AUTH_MAX` | `20` | auth routes |
+
+### Password reset
+
+`POST /auth/request-password-reset` always returns `200` (so it cannot be used to
+enumerate accounts) and emails a single-use link when the address exists.
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `PASSWORD_RESET_EXPIRES_IN` | `1h` | Lifetime of the emailed reset token |
+
+Reset tokens are **purpose-bound** (a normal access token is rejected) and
+**single-use**: the token is consumed with a Redis `GETDEL`, so a replayed link
+fails even if it is caught in transit. Completing a reset — or using
+`POST /users/me/change-password` — also records a *password epoch* in Redis, which
+`authenticate()` compares against each access token's `iat`. That is what
+invalidates sessions that were already issued, since access tokens are stateless
+and revoking the refresh token alone would not have cut them off.
+
+## Branding
+
+The product is **JestBest**, with **JB** used as the monogram in compact spots.
+
+| Asset | File |
+| --- | --- |
+| Wordmark lockup (mark + "JestBest") | `web/public/logo.svg` |
+| Mark / app icon | `web/public/mark.svg` |
+| Favicon (simplified for 16px) | `web/public/favicon.svg` |
+
+The React `<Logo />` component in `web/src/components/Logo.tsx` inlines the mark
+so the wordmark inherits the surrounding text colour, and supports
+`variant="full" | "short" | "mark"`. The palette is red to match the UI
+(`#EF4444` → `#DC2626` → `#991B1B` gradient, brand `red-600`/`red-500`).
+
 
 ## Architecture
 
@@ -224,7 +258,7 @@ The API exposes **110 endpoints** across 16 routers:
 ## Project layout
 
 ```text
-VeriBot/
+JestBest/
 ├── prisma/
 │   ├── schema.prisma          39 models
 │   └── migrations/            6 migrations
@@ -277,7 +311,7 @@ Every request is scoped to exactly one organization, resolved by
 1. **JWT access token** in `Authorization: Bearer …`. The token carries the
    caller's role for the active org; `x-org-id` overrides which of your orgs is
    active, and is rejected if you are not a member.
-2. **API key** via `x-api-key: vrb_…` **plus** `x-org-id`. Keys are stored as
+2. **API key** via `x-api-key: jb_…` **plus** `x-org-id`. Keys are stored as
    SHA-256 hashes and only ever displayed once, at creation.
 3. **Optional auth** for public endpoints that behave differently when signed in.
 
@@ -323,25 +357,31 @@ The integration suites drive the real Express app with
 Redis — no mocked Prisma. That is deliberate: tenancy bugs, transaction
 behaviour, and Prisma query mistakes are precisely what a mocked database hides.
 
-Each integration file truncates `veribot_test` in `beforeEach`, so **the suites
+Each integration file truncates `jestbest_test` in `beforeEach`, so **the suites
 must run serially** — which is why `npm test` passes `--runInBand`. Running
 `npx jest` directly without that flag will produce flaky failures.
 
 `__tests__/fixtures/testApp.ts` provides `request()`, `createTestUser()`, and
 `resetDatabase()`, and closes queues/Redis on teardown so Jest can exit.
 
-Current state: **174 tests across 11 suites, all passing.**
+Current state: **184 tests across 12 suites passing** (last full run), plus four
+suites added for the tenancy and broken-flow fixes listed below.
 
 | Suite | What it covers |
 | --- | --- |
 | `unit/utils`, `unit/validators` | slug resolution, pagination, JWT, Zod schemas |
+| `unit/services/stripeWebhook` | signature verification, tampering, replay window |
 | `rbac`, `validation` | permission matrix, validator edge cases |
 | `integration/auth` | register → verify → login → refresh → `/users/me`, password change |
+| `integration/auth/passwordReset` | purpose-bound + single-use reset tokens, password-epoch session invalidation |
 | `integration/organizations` | cross-tenant isolation, membership, role changes |
 | `integration/projects` | CRUD, pagination, archiving, dashboard |
 | `integration/testCases` | CRUD, duplicate, archive, filters, generation |
 | `integration/bugs` | CRUD, status, assignment, comments, filters |
 | `integration/apiKeys` | issue/revoke, hash never exposed, API-key auth |
+| `integration/integrations` | connecting to a foreign `projectId` is rejected; GitHub resolution prefers the bug's project |
+| `integration/agents` | unimplemented `EXECUTION`/`REPORT_AGENT` return 400, not 500 |
+| `integration/applications` | scan-status polling, cross-tenant and wrong-application rejection |
 
 ## Common tasks
 
@@ -406,3 +446,38 @@ smoke flow rather than by the automated suite.
 **Not implemented:** the AI fix agent's end-to-end PR workflow and any genuine
 deployment pipeline (Terraform/Kubernetes/GitHub Actions). Integration config is
 encrypted and stored, but no outbound code-hosting automation runs in production.
+
+### Agent types
+
+`POST /agents/trigger` accepts only the types the orchestrator can actually run:
+
+`EXPLORER`, `TEST_GENERATOR`, `FAILURE_ANALYZER`, `BUG_AGENT`, `HEALING_AGENT`,
+`CODE_AGENT`, `FIX_AGENT`.
+
+The Prisma `AgentType` enum is a superset — `EXECUTION` and `REPORT_AGENT` are
+reserved placeholders with no graph node. Sending one now fails validation with a
+`400` (`src/constants/agents.ts` owns the supported set) instead of failing inside
+the state graph with a `500`. The orchestrator guards the same set, so an internal
+caller cannot reintroduce the crash.
+
+### Integration scoping
+
+An integration is either org-wide or attached to a single project. Connecting one
+against a `projectId` you do not own is rejected with `403`; the bug → GitHub
+mirror resolves the integration for the **bug's own project** first and only then
+falls back to the org-wide default, so a bug from project A can never be filed
+into project B's repository.
+
+### Scanning an application
+
+`POST /applications/:applicationId/scan` starts an asynchronous scan and returns a
+`scanId`. Poll it with:
+
+```text
+GET /applications/:applicationId/scan/:scanId
+```
+
+It requires `APPLICATION_SCAN` and re-checks that the application belongs to the
+caller's organization, so a scan id from another tenant returns `403` and a scan
+that belongs to a different application returns `404`.
+

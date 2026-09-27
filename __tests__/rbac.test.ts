@@ -7,7 +7,7 @@ type Next = (err?: unknown) => void;
 
 const authUser = (roles: string[], permissions: string[]): AuthUser => ({
   id: 'user_1',
-  email: 'test@veribot.dev',
+  email: 'test@jestbest.dev',
   name: 'Test User',
   avatar: null,
   orgId: 'org_1',

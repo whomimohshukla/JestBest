@@ -75,7 +75,7 @@ export default function ApiKeysSettingsPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
           <h2 className="text-lg font-semibold mb-1">API Keys</h2>
-          <p className="text-sm text-muted-foreground">Programmatic access to the VeriBot API</p>
+          <p className="text-sm text-muted-foreground">Programmatic access to the JestBest API</p>
         </div>
         <button
           onClick={() => {

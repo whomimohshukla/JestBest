@@ -64,7 +64,7 @@ export const browserService = {
     // Enable video recording if requested
     if (options?.recordVideo) {
       contextOptions.recordVideo = {
-        dir: '/tmp/veribot-videos',
+        dir: '/tmp/jestbest-videos',
         size: { width: 1280, height: 800 },
       };
     }
@@ -72,7 +72,7 @@ export const browserService = {
     // Enable HAR recording if requested
     if (options?.recordHar) {
       contextOptions.recordHar = {
-        path: `/tmp/veribot-har-${Date.now()}.har`,
+        path: `/tmp/jestbest-har-${Date.now()}.har`,
         omitContent: false,
       };
     }

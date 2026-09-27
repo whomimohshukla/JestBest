@@ -299,7 +299,7 @@ export default function WebhooksSettingsPage() {
                   value={form.url}
                   onChange={(e) => setForm({ ...form, url: e.target.value })}
                   className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-                  placeholder="https://example.com/hooks/veribot"
+                  placeholder="https://example.com/hooks/jestbest"
                   disabled={createWebhookMutation.isPending}
                   required
                 />

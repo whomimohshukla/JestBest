@@ -2,7 +2,7 @@ process.env.NODE_ENV = 'test';
 // Keep test output readable: pino would otherwise print a JSON line per request.
 process.env.LOG_LEVEL = process.env.LOG_LEVEL || 'silent';
 process.env.DATABASE_URL =
-  process.env.DATABASE_URL || 'postgresql://veribot:veribot@localhost:5432/veribot_test?schema=public';
+  process.env.DATABASE_URL || 'postgresql://jestbest:jestbest@localhost:5432/jestbest_test?schema=public';
 process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 process.env.JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET || 'test-access-secret-at-least-32-chars-000';
 process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-refresh-secret-at-least-32-chars-00';

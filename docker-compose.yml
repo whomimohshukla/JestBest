@@ -3,25 +3,25 @@ version: '3.9'
 services:
   postgres:
     image: pgvector/pgvector:pg16
-    container_name: veribot-postgres
+    container_name: jestbest-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: veribot
-      POSTGRES_PASSWORD: veribot
-      POSTGRES_DB: veribot
+      POSTGRES_USER: jestbest
+      POSTGRES_PASSWORD: jestbest
+      POSTGRES_DB: jestbest
     ports:
       - '5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U veribot -d veribot']
+      test: ['CMD-SHELL', 'pg_isready -U jestbest -d jestbest']
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
     image: redis:7-alpine
-    container_name: veribot-redis
+    container_name: jestbest-redis
     restart: unless-stopped
     ports:
       - '6379:6379'
@@ -38,7 +38,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: veribot-api
+    container_name: jestbest-api
     restart: unless-stopped
     depends_on:
       postgres:
@@ -48,7 +48,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: postgresql://veribot:veribot@postgres:5432/veribot?schema=public
+      DATABASE_URL: postgresql://jestbest:jestbest@postgres:5432/jestbest?schema=public
       REDIS_URL: redis://redis:6379
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}

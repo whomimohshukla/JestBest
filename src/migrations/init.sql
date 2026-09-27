@@ -1,4 +1,4 @@
--- VeriBot initial schema (core tables)
+-- JestBest initial schema (core tables)
 -- Prisma Migrate is the source of truth for schema drift; this file documents
 -- the core relational shape and is used for reference / raw-DDL setups.
 -- Generate the full DDL with: npm run prisma:migrate -- --name init

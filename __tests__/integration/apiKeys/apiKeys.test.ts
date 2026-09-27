@@ -34,7 +34,7 @@ describe('POST /api-keys', () => {
     const res = await api.post(`${API}/api-keys`).set(auth(user)).send(newKey('CI pipeline'));
 
     expect(res.status).toBe(201);
-    expect(res.body.data.plainKey).toMatch(/^vrb_/);
+    expect(res.body.data.plainKey).toMatch(/^jb_/);
     expect(res.body.data.prefix).toBe(res.body.data.plainKey.slice(0, 8));
     expect(res.body.data.name).toBe('CI pipeline');
     expect(res.body.data.lastUsedAt).toBeNull();
@@ -108,7 +108,7 @@ describe('API key authentication', () => {
   it('rejects a forged api key', async () => {
     const res = await api
       .get(`${API}/users/me`)
-      .set({ 'x-api-key': 'vrb_totally_made_up', 'x-org-id': user.organizationId });
+      .set({ 'x-api-key': 'jb_totally_made_up', 'x-org-id': user.organizationId });
     expect(res.status).toBe(401);
   });
 

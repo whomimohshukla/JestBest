@@ -1,8 +1,8 @@
 {
-  "name": "veribot-api",
+  "name": "jestbest-api",
   "version": "0.1.0",
   "private": true,
-  "description": "VeriBot API - standalone Express API for the AI-powered QA SaaS platform",
+  "description": "JestBest API - standalone Express API for the AI-powered QA SaaS platform",
   "main": "dist/server.js",
   "engines": {
     "node": ">=20.0.0"

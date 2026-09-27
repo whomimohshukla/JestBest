@@ -6,6 +6,7 @@ import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Bot, Mail, Lock, User, Building2, ArrowRight, CheckCircle } from 'lucide-react';
+import { Logo } from '../../components/Logo';
 import { GitHubIcon } from '../../components/ui/social-icons';
 
 export default function RegisterPage() {
@@ -127,10 +128,7 @@ export default function RegisterPage() {
         >
           {/* Mobile Logo */}
           <div className="text-center mb-6 md:hidden">
-            <div className="inline-flex items-center justify-center w-14 h-14 bg-red-600 to-red-600/80 rounded-xl mb-3">
-              <Bot className="w-7 h-7 text-white" />
-            </div>
-            <h1 className="text-3xl font-bold">VeriBot</h1>
+            <Logo size={40} />
           </div>
 
           <form onSubmit={handleSubmit} className="glass p-8 rounded-2xl space-y-6 backdrop-blur-xl">

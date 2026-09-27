@@ -103,7 +103,7 @@ export const webhookService = {
     await webhookQueue.add('test-webhook', {
       webhookId,
       eventType: 'TEST_STARTED',
-      payload: { message: 'This is a test delivery from VeriBot.' },
+      payload: { message: 'This is a test delivery from JestBest.' },
       organizationId: webhook.organizationId,
     });
     return { queued: true };
@@ -159,9 +159,9 @@ export const webhookService = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Veribot-Signature': signature,
-          'X-Veribot-Event': payload.event,
-          'User-Agent': 'VeriBot-Webhook/1.0',
+          'X-JestBest-Signature': signature,
+          'X-JestBest-Event': payload.event,
+          'User-Agent': 'JestBest-Webhook/1.0',
         },
         body,
       });

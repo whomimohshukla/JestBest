@@ -14,7 +14,7 @@ interface PopupState {
 }
 
 let seq = 0;
-export const popupChannel = 'veribot-popup';
+export const popupChannel = 'jestbest-popup';
 
 export const usePopupStore = create<PopupState>((set) => ({
   popups: [],

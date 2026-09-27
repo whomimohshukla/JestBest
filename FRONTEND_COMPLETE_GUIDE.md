@@ -1,4 +1,4 @@
-# 🎨 VeriBot Frontend - Complete Implementation Guide
+# 🎨 JestBest Frontend - Complete Implementation Guide
 
 ## ✅ What's Already Done:
 
@@ -63,7 +63,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold gradient-text mb-2">VeriBot</h1>
+          <h1 className="text-4xl font-bold gradient-text mb-2">JestBest</h1>
           <p className="text-muted-foreground">AI-Powered QA Automation</p>
         </div>
         
@@ -153,7 +153,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold gradient-text mb-2">VeriBot</h1>
+          <h1 className="text-4xl font-bold gradient-text mb-2">JestBest</h1>
           <p className="text-muted-foreground">Start your QA automation journey</p>
         </div>
         
@@ -251,7 +251,7 @@ export default function PAGE_NAMEPage() {
       {/* Header */}
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold gradient-text">VeriBot</h1>
+          <h1 className="text-2xl font-bold gradient-text">JestBest</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground">Welcome, {user?.name || user?.email}</span>
             <button

@@ -40,8 +40,8 @@ const seedAdmin = async (): Promise<void> => {
     return;
   }
 
-  const passwordHash = await passwordService.hash(env.SEED_ADMIN_PASSWORD ?? 'VeriBotAdmin!2026');
-  const orgName = 'VeriBot';
+  const passwordHash = await passwordService.hash(env.SEED_ADMIN_PASSWORD ?? 'JestBestAdmin!2026');
+  const orgName = 'JestBest';
   const slug = toSlug(orgName);
 
   const organization = await prisma.organization.create({
@@ -54,7 +54,7 @@ const seedAdmin = async (): Promise<void> => {
   const user = await prisma.user.create({
     data: {
       email,
-      name: 'VeriBot Admin',
+      name: 'JestBest Admin',
       passwordHash,
       emailVerified: new Date(),
       memberships: {

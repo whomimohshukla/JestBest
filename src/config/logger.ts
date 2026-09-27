@@ -11,7 +11,7 @@ export const logger = pino({
         }
       : undefined,
   base: {
-    service: 'veribot-api',
+    service: 'jestbest-api',
     env: env.NODE_ENV,
   },
 });

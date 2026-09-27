@@ -70,8 +70,8 @@ export const emailService = {
           },
         ],
         from: {
-          email: env.EMAIL_FROM || 'notifications@veribot.ai',
-          name: 'VeriBot',
+          email: env.EMAIL_FROM || 'notifications@jestbest.ai',
+          name: 'JestBest',
         },
         subject: options.subject,
         content: [
@@ -106,7 +106,7 @@ export const emailService = {
     console.log(
       '\n' +
       '='.repeat(72) + '\n' +
-      '   VERIBOT OUTGOING EMAIL (log provider)\n' +
+      '   JESTBEST OUTGOING EMAIL (log provider)\n' +
       '='.repeat(72) + '\n' +
       `   To:      ${to}\n` +
       `   Subject: ${options.subject}\n` +
@@ -204,7 +204,7 @@ export const emailService = {
       </center>
     </div>
     <div class="footer">
-      <p>This is an automated notification from VeriBot</p>
+      <p>This is an automated notification from JestBest</p>
       <p>You're receiving this because you're subscribed to test notifications for ${data.projectName}</p>
     </div>
   </div>
@@ -271,7 +271,7 @@ export const emailService = {
       </center>
     </div>
     <div class="footer">
-      <p>This is an automated notification from VeriBot</p>
+      <p>This is an automated notification from JestBest</p>
     </div>
   </div>
 </body>
@@ -291,7 +291,7 @@ export const emailService = {
       verificationUrl?: string;
     }
   ): Promise<void> {
-    const subject = '🎉 Welcome to VeriBot - Let\'s Get Started!';
+    const subject = '🎉 Welcome to JestBest - Let\'s Get Started!';
     
     const html = `
 <!DOCTYPE html>
@@ -303,7 +303,7 @@ export const emailService = {
 <body style="${EMAIL_STYLES.body}">
   <div style="${EMAIL_STYLES.container}">
     <div style="${EMAIL_STYLES.header}">
-      <h1 style="margin: 0; font-size: 32px;">🤖 Welcome to VeriBot!</h1>
+      <h1 style="margin: 0; font-size: 32px;">🤖 Welcome to JestBest!</h1>
       <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">AI-Powered Quality Assurance Platform</p>
     </div>
     
@@ -311,7 +311,7 @@ export const emailService = {
       <h2 style="color: #333; margin-top: 0;">Hi ${data.name}! 👋</h2>
       
       <p style="font-size: 16px; line-height: 1.8;">
-        Thank you for joining VeriBot! We're excited to help you automate your testing and improve your software quality.
+        Thank you for joining JestBest! We're excited to help you automate your testing and improve your software quality.
       </p>
       
       ${data.verificationUrl ? `
@@ -351,7 +351,7 @@ export const emailService = {
       </div>
       
       <div style="background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); padding: 25px; border-radius: 8px; margin: 30px 0;">
-        <h3 style="margin: 0 0 15px 0; color: #667eea;">✨ What You Get With VeriBot</h3>
+        <h3 style="margin: 0 0 15px 0; color: #667eea;">✨ What You Get With JestBest</h3>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           <li style="margin-bottom: 10px;">🤖 AI-powered test generation</li>
           <li style="margin-bottom: 10px;">🔍 Automatic bug detection</li>
@@ -379,7 +379,7 @@ export const emailService = {
     
     <div style="${EMAIL_STYLES.footer}">
       <p style="margin: 0 0 10px 0;">
-        <strong>VeriBot</strong> - AI-Powered QA Automation
+        <strong>JestBest</strong> - AI-Powered QA Automation
       </p>
       <p style="margin: 0; font-size: 13px;">
         Questions? Reply to this email or visit our <a href="${env.APP_ORIGIN}/support" style="color: #667eea;">support center</a>
@@ -403,7 +403,7 @@ export const emailService = {
       verificationUrl: string;
     }
   ): Promise<void> {
-    const subject = '📧 Verify Your VeriBot Email Address';
+    const subject = '📧 Verify Your JestBest Email Address';
     
     const html = `
 <!DOCTYPE html>
@@ -418,7 +418,7 @@ export const emailService = {
       <p>Hi ${data.name},</p>
       
       <p style="font-size: 16px;">
-        Please verify your email address to activate your VeriBot account and start using all features.
+        Please verify your email address to activate your JestBest account and start using all features.
       </p>
       
       <center>
@@ -439,12 +439,12 @@ export const emailService = {
       </div>
       
       <p style="color: #6c757d; font-size: 14px;">
-        If you didn't create a VeriBot account, you can safely ignore this email.
+        If you didn't create a JestBest account, you can safely ignore this email.
       </p>
     </div>
     
     <div style="${EMAIL_STYLES.footer}">
-      <p style="margin: 0;">VeriBot - AI-Powered QA Automation</p>
+      <p style="margin: 0;">JestBest - AI-Powered QA Automation</p>
     </div>
   </div>
 </body>
@@ -464,7 +464,7 @@ export const emailService = {
       resetUrl: string;
     }
   ): Promise<void> {
-    const subject = '🔐 Reset Your VeriBot Password';
+    const subject = '🔐 Reset Your JestBest Password';
     
     const html = `
 <!DOCTYPE html>
@@ -507,7 +507,7 @@ export const emailService = {
     </div>
     
     <div style="${EMAIL_STYLES.footer}">
-      <p style="margin: 0;">VeriBot - AI-Powered QA Automation</p>
+      <p style="margin: 0;">JestBest - AI-Powered QA Automation</p>
     </div>
   </div>
 </body>
@@ -529,7 +529,7 @@ export const emailService = {
       invitationUrl: string;
     }
   ): Promise<void> {
-    const subject = `👥 ${data.inviterName} invited you to join ${data.organizationName} on VeriBot`;
+    const subject = `👥 ${data.inviterName} invited you to join ${data.organizationName} on JestBest`;
     
     const html = `
 <!DOCTYPE html>
@@ -542,7 +542,7 @@ export const emailService = {
     
     <div style="${EMAIL_STYLES.content}">
       <p style="font-size: 16px;">
-        <strong>${data.inviterName}</strong> has invited you to join <strong>${data.organizationName}</strong> on VeriBot!
+        <strong>${data.inviterName}</strong> has invited you to join <strong>${data.organizationName}</strong> on JestBest!
       </p>
       
       <div style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin: 25px 0;">
@@ -572,7 +572,7 @@ export const emailService = {
     </div>
     
     <div style="${EMAIL_STYLES.footer}">
-      <p style="margin: 0;">VeriBot - AI-Powered QA Automation</p>
+      <p style="margin: 0;">JestBest - AI-Powered QA Automation</p>
     </div>
   </div>
 </body>
@@ -601,7 +601,7 @@ export const emailService = {
       };
     }
   ): Promise<void> {
-    const subject = `📊 Your Weekly VeriBot Summary (${data.weekStart} - ${data.weekEnd})`;
+    const subject = `📊 Your Weekly JestBest Summary (${data.weekStart} - ${data.weekEnd})`;
     const passRate = data.stats.testsRun > 0 
       ? Math.round((data.stats.testsPassed / data.stats.testsRun) * 100) 
       : 0;
@@ -698,7 +698,7 @@ export const emailService = {
     </div>
     
     <div style="${EMAIL_STYLES.footer}">
-      <p style="margin: 0 0 10px 0;">VeriBot - AI-Powered QA Automation</p>
+      <p style="margin: 0 0 10px 0;">JestBest - AI-Powered QA Automation</p>
       <p style="margin: 0; font-size: 12px;">
         <a href="${env.APP_ORIGIN}/settings/notifications" style="color: #667eea;">Manage email preferences</a>
       </p>
@@ -766,7 +766,7 @@ export const emailService = {
     </div>
 
     <div style="${EMAIL_STYLES.footer}">
-      <p style="margin: 0;">VeriBot - AI-Powered QA Automation</p>
+      <p style="margin: 0;">JestBest - AI-Powered QA Automation</p>
     </div>
   </div>
 </body>
@@ -843,7 +843,7 @@ export const emailService = {
     </div>
     
     <div style="${EMAIL_STYLES.footer}">
-      <p style="margin: 0;">VeriBot - AI-Powered QA Automation</p>
+      <p style="margin: 0;">JestBest - AI-Powered QA Automation</p>
     </div>
   </div>
 </body>
@@ -939,7 +939,7 @@ export const emailService = {
     </div>
     
     <div style="${EMAIL_STYLES.footer}">
-      <p style="margin: 0;">VeriBot - AI-Powered QA Automation</p>
+      <p style="margin: 0;">JestBest - AI-Powered QA Automation</p>
     </div>
   </div>
 </body>
@@ -1034,7 +1034,7 @@ export const emailService = {
     </div>
     
     <div style="${EMAIL_STYLES.footer}">
-      <p style="margin: 0;">VeriBot - AI-Powered QA Automation</p>
+      <p style="margin: 0;">JestBest - AI-Powered QA Automation</p>
       <p style="margin: 5px 0 0 0; font-size: 12px; color: #dc2626;">
         This is a high-priority alert
       </p>

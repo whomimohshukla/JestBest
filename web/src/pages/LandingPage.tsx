@@ -4,20 +4,21 @@ import { motion } from 'framer-motion';
 import {
   Bot, Brain, Bug, LineChart, GitBranch, Terminal,
   CheckCircle2, Play,
-  Flame, Check, Plus, ArrowRight, Database,
-  Boxes, MousePointerClick, Cpu, ChevronDown,
+  Flame, Check, Plus, ArrowRight,
 } from 'lucide-react';
 import { FloatingNavbar } from '../components/FloatingNavbar';
+import { RunConsole } from '../components/RunConsole';
+import { Logo } from '../components/Logo';
 
 const features = [
-  { icon: Brain, title: 'AI Test Generation', description: 'VeriBot explores your app, maps flows, and writes resilient test suites automatically.', bullets: ['Natural-language authoring', 'Self-healing selectors', 'Edge-case discovery'] },
+  { icon: Brain, title: 'AI Test Generation', description: 'JestBest explores your app, maps flows, and writes resilient test suites automatically.', bullets: ['Natural-language authoring', 'Self-healing selectors', 'Edge-case discovery'] },
   { icon: Bug, title: 'Automatic Bug Detection', description: 'Every failure is analyzed and enriched with screenshots, video, and AI root-cause analysis.', bullets: ['Video + screenshot evidence', 'Severity auto-triage', 'One-click issue creation'] },
   { icon: LineChart, title: 'Live Quality Analytics', description: 'Track pass rates and flaky tests on a live dashboard. Know when you are safe to ship.', bullets: ['Flaky test detection', 'Release risk scoring', 'Weekly digests'] },
   { icon: GitBranch, title: 'Seamless CI/CD', description: 'Trigger runs from any pipeline. Isolated environments report results back instantly.', bullets: ['GitHub Actions-ready', 'Webhook-driven runs', 'Parallel execution'] },
 ];
 
 const steps = [
-  { step: '01', title: 'Connect your app', description: 'Add your URL or repo. VeriBot discovers pages and flows instantly.' },
+  { step: '01', title: 'Connect your app', description: 'Add your URL or repo. JestBest discovers pages and flows instantly.' },
   { step: '02', title: 'AI writes tests', description: 'Explore, map, and author a full QA suite with zero scripting.' },
   { step: '03', title: 'Run and ship', description: 'Parallel runs with rich evidence, then AI triage before you ship.' },
 ];
@@ -36,9 +37,9 @@ const plans = [
 ];
 
 const faqs = [
-  { q: 'How does VeriBot generate tests?', a: 'Our agents crawl your deployed app, map every page and interaction, then write resilient tests that self-heal when selectors change.' },
+  { q: 'How does JestBest generate tests?', a: 'Our agents crawl your deployed app, map every page and interaction, then write resilient tests that self-heal when selectors change.' },
   { q: 'Does the AI actually find bugs?', a: 'Yes. Agents adversarially explore edge cases, watch console and network, and flag probable bugs with screenshots and root-cause.' },
-  { q: 'Can it run in CI/CD?', a: 'VeriBot ships Playwright runners with CLI + GitHub Actions support, so suites run on every push.' },
+  { q: 'Can it run in CI/CD?', a: 'JestBest ships Playwright runners with CLI + GitHub Actions support, so suites run on every push.' },
   { q: 'How is this different from plain Playwright?', a: 'You describe the outcome; agents handle exploration, authoring, maintenance, and analysis for you.' },
 ];
 
@@ -48,13 +49,6 @@ function scrollTo(id: string) {
 
 export default function LandingPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
-
-  const heroNodes = [
-    { icon: Boxes, label: 'App', sub: 'app.veribot.ai' },
-    { icon: Database, label: 'Suites', sub: '12 · 340' },
-    { icon: Cpu, label: 'AI Agents', sub: 'explore · hunt · analyze' },
-    { icon: MousePointerClick, label: 'Steps', sub: '32 pass · 2 flaky' },
-  ];
 
   return (
     <div className="min-h-screen bg-black text-white antialiased selection:bg-red-500/30">
@@ -83,7 +77,7 @@ export default function LandingPage() {
             </motion.h1>
             <motion.p initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:0.3,duration:0.6}}
               className="mt-6 max-w-md text-lg font-light text-zinc-400">
-              VeriBot explores your product, writes the tests, and shows you where it fails — before anything ships.
+              JestBest explores your product, writes the tests, and shows you where it fails — before anything ships.
             </motion.p>
             <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:0.45,duration:0.6}}
               className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -98,55 +92,12 @@ export default function LandingPage() {
             </motion.div>
           </motion.div>
 
-          {/* ---- RIGHT: dotted ER / box-inside-box flow ---- */}
-          <motion.div initial={{opacity:0,scale:0.96}} animate={{opacity:1,scale:1}} transition={{delay:0.3,duration:0.6}}
-            className="relative overflow-hidden rounded-2xl border border-white/12 bg-black/60 p-5">
-            <div className="dotted-grid absolute inset-0 opacity-25 pointer-events-none" />
-            <div className="relative rounded-xl border border-white/10">
-              <div className="absolute inset-2 rounded-lg border border-dashed border-red-500/30" />
-              <div className="absolute inset-5 rounded-md border border-white/10 bg-black/40" />
-              <div className="space-y-3 p-5">
-                {heroNodes.map((n, i) => {
-                  const Icon = n.icon;
-                  return (
-                    <motion.div key={n.label} initial={{opacity:0,x:14}} animate={{opacity:1,x:0}} transition={{delay:0.5+i*0.12}}
-                      whileHover={{scale:1.05}} className="group flex items-center gap-3 rounded-xl border border-white/10 bg-black/70 px-4 py-3 hover:border-red-500/40 transition-all">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 group-hover:border-red-500/30">
-                        <Icon className="h-4 w-4 text-red-400" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-white">{n.label}</p>
-                        <p className="text-xs text-zinc-500">{n.sub}</p>
-                      </div>
-                      <ChevronDown className="h-3 w-3 text-zinc-600" />
-                    </motion.div>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-              {[['VeriBot','AI engine'],['Playwright','runner'],['CI/CD','ready']].map(([a, b]) => (
-                <div key={a} className="rounded-lg border border-white/10 bg-black/60 px-2 py-2">
-                  <p className="text-xs font-bold text-white">{a}</p>
-                  <p className="text-[10px] text-zinc-500">{b}</p>
-                </div>
-              ))}
-            </div>
+          {/* ---- RIGHT: live run console ---- */}
+          <motion.div initial={{opacity:0,scale:0.96}} animate={{opacity:1,scale:1}} transition={{delay:0.3,duration:0.6}}>
+            <RunConsole />
           </motion.div>
         </div>
       </section>
-
-      {/* ===== LOGOS / TRUST STRIP ===== */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="border-y border-white/10 py-8">
-          <p className="text-center text-xs uppercase tracking-widest text-zinc-500">Built by engineers who ship daily</p>
-          <div className="mt-6 grid grid-cols-3 gap-4 sm:grid-cols-6">
-            {['Acme','Nimbus','Vertex','Foundry','Quanta','Orbit'].map((c) => (
-              <div key={c} className="text-center text-lg font-bold text-zinc-600">{c}</div>
-            ))}
-          </div>
-        </div>
-      </div>
 
       {/* ===== FEATURES ===== */}
       <section id="features" className="py-24 lg:py-32">
@@ -302,9 +253,9 @@ export default function LandingPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14">
           <div className="flex flex-col lg:flex-row items-start justify-between gap-10">
             <div className="max-w-sm">
-              <a className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600"><Bot className="h-5 w-5 text-white" /></div>
-              </a>
+              <Link to="/" className="flex items-center gap-2.5">
+                <Logo variant="mark" size={34} />
+              </Link>
               <p className="mt-4 text-sm text-zinc-400">Let agents generate, run, and analyze your tests.</p>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-10">
@@ -314,7 +265,7 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-white/10 pt-8">
-            <p className="text-xs text-zinc-500">&copy; 2026 VeriBot, Inc. All rights reserved.</p>
+            <p className="text-xs text-zinc-500">&copy; 2026 JestBest, Inc. All rights reserved.</p>
             <div className="flex gap-6 text-xs text-zinc-500"><a href="/integrations" className="hover:text-white">Integrations</a><a href="/settings/profile" className="hover:text-white">Account</a><a href="/dashboard" className="hover:text-white">Dashboard</a></div>
           </div>
         </div>

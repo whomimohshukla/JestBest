@@ -1,7 +1,7 @@
 import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 
-const ISSUER = 'VeriBot';
+const ISSUER = 'JestBest';
 
 export const twoFactorService = {
   generateSecret(): string {

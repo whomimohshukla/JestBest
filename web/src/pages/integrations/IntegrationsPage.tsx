@@ -38,7 +38,7 @@ const INTEGRATION_META: Record<string, IntegrationMeta> = {
   GITHUB: {
     name: 'GitHub',
     icon: GitBranch,
-    description: 'Auto-report bugs as GitHub issues and sync them back to VeriBot.',
+    description: 'Auto-report bugs as GitHub issues and sync them back to JestBest.',
     fields: [
       { key: 'token', label: 'Access Token', type: 'password', placeholder: 'ghp_...' },
       { key: 'repository', label: 'Repository', placeholder: 'owner/repo' },

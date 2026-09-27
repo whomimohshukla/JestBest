@@ -2,6 +2,35 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Brand red — a softer, lighter ramp than stock Tailwind red.
+ *
+ * Stock red-600 (#DC2626) and red-500 (#EF4444) are ~83%/~72% chroma, which
+ * reads as harsh on this near-black surface (#050505) and strained the eyes.
+ * These stops keep the hue at 0deg (still a true red) but drop chroma, so the
+ * page looks calmer while contrast improves:
+ *
+ *   red-500 #F08080  7.87:1 on #050505   (stock: 5.42:1)
+ *   red-600 #D04552  4.52:1 on #050505, 4.51:1 against white text
+ *   red-700 #A63A45  6.34:1 against white text — used for hover, not red-500,
+ *                    because hovering *lighter* would drop white text to 2.6:1
+ *
+ * red-600 is the darkest value that still clears 4.5:1 for the white labels that
+ * sit on it, so it is the floor for solid fills; never lighten it further.
+ */
+@theme {
+  --color-red-100: #fbefed;
+  --color-red-200: #f6dbd6;
+  --color-red-300: #f2c2bb;
+  --color-red-400: #f28b82;
+  --color-red-500: #f08080;
+  --color-red-600: #d04552;
+  --color-red-700: #a63a45;
+  --color-red-800: #8a2e3a;
+  --color-red-900: #6b2330;
+  --color-red-950: #3a1116;
+}
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));

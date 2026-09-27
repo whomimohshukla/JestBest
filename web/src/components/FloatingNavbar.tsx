@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bot, Menu, X, ArrowRight } from 'lucide-react';
+import { Menu, X, ArrowRight } from 'lucide-react';
+import { Logo } from './Logo';
 
 const navLinks = [
   { label: 'Features', href: '#features', id: 'features' },
@@ -43,11 +44,8 @@ export function FloatingNavbar() {
         }`}
       >
         <div className="flex items-center justify-between gap-2">
-          <Link to="/" className="flex items-center gap-2 pl-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-600 shadow-lg shadow-teal-500/40">
-              <Bot className="h-5 w-5 text-white" />
-            </div>
-
+          <Link to="/" className="flex items-center pl-1">
+            <Logo variant="mark" size={30} />
           </Link>
 
           <nav className="hidden lg:flex items-center gap-0.5">

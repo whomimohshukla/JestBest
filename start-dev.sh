@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# VeriBot Development Startup Script
+# JestBest Development Startup Script
 # This script starts both backend and frontend in development mode
 
-echo "🚀 Starting VeriBot Development Environment..."
+echo "🚀 Starting JestBest Development Environment..."
 echo ""
 
 # Colors for output

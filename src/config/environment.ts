@@ -15,14 +15,14 @@ const envSchema = z.object({
 
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().default('redis://localhost:6379'),
-  REDIS_KEY_PREFIX: z.string().default('veribot:'),
+  REDIS_KEY_PREFIX: z.string().default('jestbest:'),
 
   JWT_ACCESS_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_ACCESS_EXPIRES_IN: z.string().default('15m'),
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   PASSWORD_RESET_EXPIRES_IN: z.string().default('1h'),
-  JWT_ISSUER: z.string().default('veribot'),
+  JWT_ISSUER: z.string().default('jestbest'),
 
   ENCRYPTION_KEY: z.string().min(32),
 
@@ -36,7 +36,7 @@ const envSchema = z.object({
   AWS_REGION: z.string().default('us-east-1'),
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
-  AWS_S3_BUCKET: z.string().default('veribot-artifacts'),
+  AWS_S3_BUCKET: z.string().default('jestbest-artifacts'),
   AWS_S3_ENDPOINT: z.string().optional(),
 
   AI_PROVIDER: z.enum(['openai', 'gemini', 'huggingface', 'mock']).default('mock'),
@@ -55,7 +55,7 @@ const envSchema = z.object({
 
   EMAIL_PROVIDER: z.enum(['sendgrid', 'ses', 'smtp', 'log']).default('log'),
   SENDGRID_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default('notifications@veribot.ai'),
+  EMAIL_FROM: z.string().default('notifications@jestbest.ai'),
   EMAIL_INBOX_FILE: z.string().default('.dev-mailbox.log'),
   REQUIRE_EMAIL_VERIFICATION: z
     .string()

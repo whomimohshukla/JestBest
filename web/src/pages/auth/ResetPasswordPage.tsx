@@ -4,7 +4,8 @@ import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { Bot, Lock, ArrowRight, Sparkles, AlertCircle, Loader2, CheckCircle2, KeyRound } from 'lucide-react';
+import { Lock, ArrowRight, AlertCircle, Loader2, CheckCircle2, KeyRound } from 'lucide-react';
+import { Logo } from '../../components/Logo';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
@@ -75,14 +76,10 @@ setIsLoading(true);
             initial={{ scale: 0.5 }}
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 200, damping: 15 }}
-            className="inline-flex items-center justify-center w-16 h-16  from-red-600 to-red-600/80 rounded-2xl mb-4"
+            className="mb-3 flex justify-center"
           >
-            <Bot className="w-8 h-8 text-white" />
+            <Logo size={44} />
           </motion.div>
-          <h1 className="text-4xl font-bold gradient-text mb-2 flex items-center justify-center gap-2">
-            VeriBot
-            <Sparkles className="w-6 h-6 text-red-500 animate-pulse" />
-          </h1>
           <p className="text-muted-foreground">AI-Powered QA Automation Platform</p>
         </div>
 

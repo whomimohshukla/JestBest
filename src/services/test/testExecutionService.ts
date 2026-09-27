@@ -157,7 +157,7 @@ export const testExecutionService = {
       const results = await pageService.runSteps(page, effectiveSteps, baseUrl);
       const failedStep = results.find((r) => !r.success);
 
-      const screenshotPath = failedStep ? `/tmp/veribot-${context.testRunId}-${testCase.id}.png` : null;
+      const screenshotPath = failedStep ? `/tmp/jestbest-${context.testRunId}-${testCase.id}.png` : null;
       const screenshotUrl =
         failedStep && screenshotPath ? await pageService.captureScreenshot(page, screenshotPath) : null;
 

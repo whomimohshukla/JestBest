@@ -1,4 +1,4 @@
-# VeriBot Frontend Structure
+# JestBest Frontend Structure
 
 ## 📁 Folder Structure
 

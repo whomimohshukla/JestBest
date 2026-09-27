@@ -331,14 +331,14 @@ $ npm run build
 
 1. **Start Backend**
    ```bash
-   cd /home/whomimohshukla/Desktop/VeriBot
+   cd /home/whomimohshukla/Desktop/JestBest
    npm run dev
    ```
    Backend runs on: `http://localhost:4000`
 
 2. **Start Frontend**
    ```bash
-   cd /home/whomimohshukla/Desktop/VeriBot/web
+   cd /home/whomimohshukla/Desktop/JestBest/web
    npm run dev
    ```
    Frontend runs on: `http://localhost:5173`
@@ -469,6 +469,6 @@ $ npm run build
 
 ---
 
-**Built with ❤️ by the VeriBot team**
+**Built with ❤️ by the JestBest team**
 
 🎨 Modern UI | ⚡ Fast Performance | 📱 Fully Responsive | 🔒 Secure

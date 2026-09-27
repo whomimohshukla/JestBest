@@ -97,7 +97,7 @@ describe('cross-tenant isolation on /organizations', () => {
     const res = await api
       .post(`${API}/organizations/${victim.organizationId}/invitations`)
       .set(auth(attacker))
-      .send({ email: 'intruder@veribot.test', role: 'ADMIN' });
+      .send({ email: 'intruder@jestbest.test', role: 'ADMIN' });
 
     expect(res.status).toBe(403);
   });

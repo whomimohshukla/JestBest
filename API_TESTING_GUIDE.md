@@ -1,4 +1,4 @@
-# VeriBot API Testing Guide
+# JestBest API Testing Guide
 
 ## ✅ Server Status: RUNNING
 - **Port:** 4000
@@ -109,7 +109,7 @@ curl -X POST http://localhost:4000/api/v1/projects \
   -H "Content-Type: application/json" \
   -d '{
     "name": "My Test Project",
-    "description": "Testing VeriBot API",
+    "description": "Testing JestBest API",
     "organizationId": "YOUR_ORG_ID"
   }'
 ```
@@ -332,7 +332,7 @@ curl http://localhost:4000/api/v1/api-keys \
 # Register
 TOKEN=$(curl -s -X POST http://localhost:4000/api/v1/auth/register \
   -H "Content-Type: application/json" \
-  -d '{"email":"demo@veribot.ai","password":"Demo123!@#","name":"Demo User"}' \
+  -d '{"email":"demo@jestbest.ai","password":"Demo123!@#","name":"Demo User"}' \
   | jq -r '.data.token')
 
 echo "Token: $TOKEN"
@@ -434,7 +434,7 @@ The server is running with detailed logging. Watch the terminal for:
 ### Check Database
 ```bash
 # Connect to database
-docker compose exec postgres psql -U veribot -d veribot
+docker compose exec postgres psql -U jestbest -d jestbest
 
 # Inside psql:
 \dt                     # List tables
@@ -449,7 +449,7 @@ docker compose exec redis redis-cli
 
 # Inside redis-cli:
 KEYS *                 # List all keys
-GET veribot:user:123   # Get specific key
+GET jestbest:user:123   # Get specific key
 QUIT                   # Exit
 ```
 

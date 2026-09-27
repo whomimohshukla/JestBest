@@ -230,7 +230,7 @@ export const tokenService = {
 
   generateApiKey: (): string => {
     const entropy = randomBytes(24);
-    return `vrb_${entropy.toString('base64url')}`;
+    return `jb_${entropy.toString('base64url')}`;
   },
 
   hashApiKey: async (apiKey: string): Promise<string> => {

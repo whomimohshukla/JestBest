@@ -3,12 +3,11 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Bot,
   LayoutDashboard,
   FolderKanban,
+  PlaySquare,
   FlaskConical,
   Layers,
-  PlaySquare,
   Bug,
   BarChart3,
   BotMessageSquare,
@@ -20,6 +19,7 @@ import {
   X,
   ChevronRight,
 } from 'lucide-react';
+import { Logo } from './Logo';
 import { useState } from 'react';
 import { cn } from '../utils/cn';
 import { OfflineBanner } from './ui/OfflineBanner';
@@ -86,11 +86,8 @@ export default function Layout({ children }: LayoutProps) {
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            <Link to="/dashboard" className="flex items-center gap-2">
-              <div className="w-9 h-9  from-red-600 to-red-600/80 rounded-lg flex items-center justify-center shadow-lg shadow-primary/20">
-                <Bot className="w-5 h-5 text-white" />
-              </div>
-
+            <Link to="/dashboard" className="flex items-center">
+              <Logo variant="mark" size={30} />
             </Link>
             {organization && (
               <div className="hidden md:flex items-center gap-2 ml-2 pl-4 border-l border-border">

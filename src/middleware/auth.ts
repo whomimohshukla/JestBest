@@ -18,7 +18,7 @@ export const authenticate = (options: AuthenticateOptions = {}) => {
     const apiKeyHeader = req.headers['x-api-key'];
     const header = req.headers.authorization;
 
-    if (apiKeyHeader && typeof apiKeyHeader === 'string' && apiKeyHeader.startsWith('vrb_')) {
+    if (apiKeyHeader && typeof apiKeyHeader === 'string' && apiKeyHeader.startsWith('jb_')) {
       return authenticateWithApiKey(req, next, options, apiKeyHeader);
     }
 

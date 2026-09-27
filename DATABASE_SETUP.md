@@ -1,4 +1,4 @@
-# VeriBot Database Setup Guide
+# JestBest Database Setup Guide
 
 ## Issue
 The application can't connect to PostgreSQL at `localhost:5432`.
@@ -13,7 +13,7 @@ Make sure Docker Desktop is running on your system.
 
 ### Step 2: Start Database Services
 ```bash
-cd /home/whomimohshukla/Desktop/VeriBot
+cd /home/whomimohshukla/Desktop/JestBest
 docker compose up -d postgres redis
 ```
 
@@ -22,7 +22,7 @@ docker compose up -d postgres redis
 docker compose ps
 ```
 
-You should see both `veribot-postgres` and `veribot-redis` as "running (healthy)".
+You should see both `jestbest-postgres` and `jestbest-redis` as "running (healthy)".
 
 ### Step 4: Run Database Migrations
 ```bash
@@ -57,16 +57,16 @@ sudo systemctl enable postgresql
 sudo -u postgres psql
 
 # Inside psql prompt, run:
-CREATE DATABASE veribot;
-CREATE USER veribot WITH PASSWORD 'veribot';
-GRANT ALL PRIVILEGES ON DATABASE veribot TO veribot;
-ALTER DATABASE veribot OWNER TO veribot;
+CREATE DATABASE jestbest;
+CREATE USER jestbest WITH PASSWORD 'jestbest';
+GRANT ALL PRIVILEGES ON DATABASE jestbest TO jestbest;
+ALTER DATABASE jestbest OWNER TO jestbest;
 \q
 ```
 
 ### Step 3: Install pgvector Extension
 ```bash
-sudo -u postgres psql -d veribot
+sudo -u postgres psql -d jestbest
 
 # Inside psql:
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -76,7 +76,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 ### Step 4: Update .env (if using different port)
 If your PostgreSQL is on a different port (e.g., 5433), update:
 ```env
-DATABASE_URL=postgresql://veribot:veribot@localhost:5433/veribot?schema=public
+DATABASE_URL=postgresql://jestbest:jestbest@localhost:5433/jestbest?schema=public
 ```
 
 ### Step 5: Install Redis
@@ -123,7 +123,7 @@ npm run dev
 
 Once the app starts, you should see:
 ```
-[INFO] VeriBot API listening
+[INFO] JestBest API listening
   port: 4000
   nodeEnv: "development"
 ```
@@ -192,7 +192,7 @@ postgres:
 
 And update `.env`:
 ```env
-DATABASE_URL=postgresql://veribot:veribot@localhost:5433/veribot?schema=public
+DATABASE_URL=postgresql://jestbest:jestbest@localhost:5433/jestbest?schema=public
 ```
 
 ### "Port 6379 already in use"
@@ -221,7 +221,7 @@ docker compose ps
 
 2. Check health status:
 ```bash
-docker compose exec postgres pg_isready -U veribot
+docker compose exec postgres pg_isready -U jestbest
 ```
 
 3. Restart services:
@@ -247,7 +247,7 @@ Current configuration in `.env`:
 
 ```env
 # Database
-DATABASE_URL=postgresql://veribot:veribot@localhost:5432/veribot?schema=public
+DATABASE_URL=postgresql://jestbest:jestbest@localhost:5432/jestbest?schema=public
 
 # Redis
 REDIS_URL=redis://localhost:6379

@@ -14,7 +14,7 @@ export const queueConnection: ConnectionOptions = {
  * by the test suite (and vice versa), which points the jobs at the wrong
  * database and shows up as unexplained multi-second stalls.
  */
-export const queuePrefix = `veribot:queues:${env.NODE_ENV ?? 'development'}`;
+export const queuePrefix = `jestbest:queues:${env.NODE_ENV ?? 'development'}`;
 
 export const defaultJobOptions = {
   attempts: 3,

@@ -97,7 +97,7 @@ const context = await browserService.newContext({
 - Test success notifications
 - Bug creation notifications
 - Daily summary reports
-- Interactive buttons linking to VeriBot
+- Interactive buttons linking to JestBest
 - Color-coded severity indicators
 - Top failing tests list
 

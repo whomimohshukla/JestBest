@@ -46,7 +46,7 @@ const main = async (): Promise<void> => {
         pid: process.pid,
         bootMs: Date.now() - startedAt,
       },
-      'VeriBot API listening'
+      'JestBest API listening'
     );
   });
 };
