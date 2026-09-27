@@ -17,6 +17,7 @@ export interface StartRunParams {
   testCaseIds?: string[];
   environmentId?: string;
   testUserId?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export const testRunService = {
@@ -48,7 +49,7 @@ export const testRunService = {
       createdById: params.createdById,
       status: 'PENDING',
       totalTests: tests.length,
-      metadata: { testCaseIds },
+      metadata: { testCaseIds, ...(params.metadata ?? {}) },
     });
 
     await testRunRepository.createResults(testRun.id, testCaseIds);
@@ -127,9 +128,8 @@ export const testRunService = {
 
   async list(where: Prisma.TestRunWhereInput, page = 1, pageSize = 20): Promise<ListResponse<TestRun>> {
     const skip = (page - 1) * pageSize;
-    const { status, projectId } = where;
     const [items, total] = await Promise.all([
-      testRunRepository.list(projectId as string, skip, pageSize, status as string | undefined),
+      testRunRepository.list(where, skip, pageSize),
       testRunRepository.count(where),
     ]);
     return pagination(items, total, { page, pageSize });
