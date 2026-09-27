@@ -18,5 +18,11 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // shadcn/ui co-locates the cva() variant builders with their components
+      // (buttonVariants, badgeVariants, ...). Those are constants, and the rule
+      // already permits them via allowConstantExport.
+      'react-refresh/only-export-components': ['error', { allowConstantExport: true }],
+    },
   },
 ])

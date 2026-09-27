@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../config/environment';
+import { UnauthorizedError } from './errors';
 import type { JwtPayload } from '../types/auth.types';
 import { getSecondsFromNow } from './helpers';
 
@@ -33,9 +34,19 @@ export const refreshTokenExpirySeconds = (): number => {
 };
 
 export const verifyToken = (token: string, type: TokenType): JwtPayload => {
-  return jwt.verify(token, getSecretForType(type), {
-    issuer: env.JWT_ISSUER,
-  }) as JwtPayload;
+  try {
+    return jwt.verify(token, getSecretForType(type), {
+      issuer: env.JWT_ISSUER,
+    }) as JwtPayload;
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new UnauthorizedError('Your session has expired. Please sign in again.');
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw new UnauthorizedError('Invalid or expired token.');
+    }
+    throw error;
+  }
 };
 
 const parseExpiry = (value: string): number => {

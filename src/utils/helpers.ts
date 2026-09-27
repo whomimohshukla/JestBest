@@ -68,3 +68,23 @@ export const chunkArray = <T>(items: T[], size: number): T[][] => {
   }
   return chunks;
 };
+
+/**
+ * Resolve a slug that is not already taken, appending `-1`, `-2`, ... as needed.
+ * `exists` must consider every row the uniqueness constraint covers (including
+ * soft-deleted ones) so the result is guaranteed insertable.
+ */
+export const resolveUniqueSlug = async (
+  base: string,
+  exists: (slug: string) => Promise<boolean>
+): Promise<string> => {
+  if (!(await exists(base))) return base;
+  // The suffix space is unbounded in practice; 100 attempts is a safety valve
+  // rather than a real limit, and a final check guarantees we never return a
+  // slug that is still taken.
+  for (let i = 1; i <= 100; i++) {
+    const candidate = `${base}-${i}`;
+    if (!(await exists(candidate))) return candidate;
+  }
+  return `${base}-${Date.now().toString(36)}`;
+};

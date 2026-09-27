@@ -38,6 +38,12 @@ declare global {
       requestId: string;
       user?: AuthUser;
       orgId?: string;
+      /**
+       * Verbatim bytes of the request body, retained only for webhook routes that
+       * must verify a signature over the exact payload Stripe/others sent.
+       * Re-serializing a parsed body is not signature-safe.
+       */
+      rawBody?: Buffer;
     }
   }
 }

@@ -14,6 +14,7 @@ export const runTestsSchema = z.object({
   testCaseIds: z.array(z.string().min(1)).optional(),
   environmentId: z.string().optional(),
   testUserId: z.string().optional(),
+  triggerType: z.enum(['MANUAL', 'SCHEDULED', 'API', 'CI']).optional(),
 });
 
 export const scheduleTestRunSchema = z.object({

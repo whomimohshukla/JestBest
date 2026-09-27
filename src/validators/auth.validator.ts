@@ -34,6 +34,28 @@ export const changePasswordSchema = z.object({
   newPassword: z.string().min(8, 'New password must be at least 8 characters'),
 });
 
+export const verifyTwoFactorSchema = z.object({
+  token: z.string().min(1, 'Two-factor token is required'),
+  code: z.string().regex(/^\d{6}$/, 'Verification code must be 6 digits'),
+});
+
+export const setupTwoFactorSchema = z.object({
+  password: z.string().min(1, 'Current password is required'),
+});
+
+export const enableTwoFactorSchema = z.object({
+  code: z.string().regex(/^\d{6}$/, 'Verification code must be 6 digits'),
+});
+
+export const disableTwoFactorSchema = z.object({
+  password: z.string().min(1, 'Current password is required'),
+  code: z.string().regex(/^\d{6}$/, 'Verification code must be 6 digits').optional(),
+});
+
+export const suspendAccountSchema = z.object({
+  days: z.number().int().min(1).max(365).optional(),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;

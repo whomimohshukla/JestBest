@@ -14,8 +14,13 @@ export interface ApiResponse<T> {
 
 export interface ApiError {
   success: false;
-  error: string;
-  message: string;
+  error: {
+    code: string;
+    message: string;
+    details?: unknown;
+    requestId?: string;
+  };
+  message?: string;
 }
 
 export interface Paginated<T> {
@@ -33,6 +38,8 @@ export interface User {
   name: string | null;
   avatar: string | null;
   emailVerified: boolean;
+  twoFactorEnabled: boolean;
+  suspendedUntil: string | null;
   createdAt: string;
 }
 
@@ -43,11 +50,41 @@ export interface TokenPair {
   tokenType: string;
 }
 
+export interface AuthOrganization {
+  id: string;
+  name: string;
+  slug: string;
+  requireTwoFactor: boolean;
+}
+
 export interface AuthResult {
   user: User;
-  organization: { id: string; name: string; slug: string } | null;
+  organization: AuthOrganization | null;
   tokens: TokenPair;
 }
+
+export interface TwoFactorSetupBundle {
+  secret: string;
+  otpauthUrl: string;
+  qrDataUrl: string;
+}
+
+export interface TwoFactorAuthResult {
+  requiresTwoFactor: true;
+  twoFactorToken: string;
+  user: User;
+  organization: AuthOrganization | null;
+  setup?: TwoFactorSetupBundle;
+}
+
+export interface VerificationRequiredAuthResult {
+  verificationRequired: true;
+  verificationToken: string;
+  user: User;
+  organization: AuthOrganization | null;
+}
+
+export type AuthResponse = AuthResult | TwoFactorAuthResult | VerificationRequiredAuthResult;
 
 export interface RegisterInput {
   email: string;
@@ -63,8 +100,11 @@ export interface Organization {
   id: string;
   name: string;
   slug: string;
-  logo: string | null;
-  createdAt: string;
+  logo?: string | null;
+  createdAt?: string;
+  description?: string | null;
+  website?: string | null;
+  requireTwoFactor?: boolean;
 }
 
 export interface Membership {
@@ -142,21 +182,20 @@ export type TestRunStatus = 'PENDING' | 'QUEUED' | 'RUNNING' | 'PASSED' | 'FAILE
 export interface TestRun {
   id: string;
   projectId: string;
-  suiteId?: string | null;
+  testSuiteId?: string | null;
+  environmentId?: string | null;
+  testUserId?: string | null;
+  createdById: string | null;
   status: TestRunStatus;
-  triggerType: string;
   totalTests: number;
   passedTests: number;
   failedTests: number;
   skippedTests: number;
-  erroredTests: number;
   duration: number | null;
-  startedAt?: string | null;
-  completedAt?: string | null;
-  createdById?: string | null;
+  executionStartedAt?: string | null;
+  executionCompletedAt?: string | null;
   metadata?: Record<string, unknown> | null;
   createdAt: string;
-  testCase?: TestCase;
 }
 
 export interface TestResult {
@@ -191,6 +230,7 @@ export interface Bug {
   assigneeId: string | null;
   createdById: string | null;
   testResultId: string | null;
+  githubIssueUrl: string | null;
   evidence: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
@@ -239,6 +279,51 @@ export interface AnalyticsSummary {
   flakyTests: FlakyTest[];
 }
 
+// ===== Dashboard / Analytics API payloads (mirrors backend analytics controller) =====
+export type QualityLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+
+export interface QualityScore {
+  score: number;
+  level: QualityLevel;
+  components: {
+    passRate: number;
+    testCoverage: number;
+    bugBurden: number;
+    flakiness: number;
+  };
+}
+
+export interface RiskScore {
+  riskScore: number;
+  riskLevel: RiskLevel;
+  details: {
+    openCriticalBugs: number;
+    failureRate: number;
+    qualityScore: number;
+  };
+}
+
+export interface DashboardAnalytics {
+  projects: Project[];
+  recentRuns: TestRun[];
+  openBugs: number;
+  totalCases: number;
+  quality: QualityScore | null;
+  risk: RiskScore | null;
+}
+
+export interface TestMetricsResponse {
+  daily: Array<{ date: string; runs: number; passed: number; failed: number; skipped: number }>;
+  totals: { runs: number; passed: number; failed: number; skipped: number; passRate: number };
+}
+
+export interface AgentMetrics {
+  totals: { total: number; completed: number; failed: number; successRate: number };
+  byType: Record<string, number>;
+  cost: { usd: number; tokensUsed: number };
+}
+
 // ===== Agents =====
 export type AgentType = 'TEST_EXPLORER' | 'BUG_HUNTER' | 'REGRESSION_ANALYST' | 'PERFORMANCE_AUDITOR' | 'CODE_QUALITY';
 export type AgentStatus = 'IDLE' | 'RUNNING' | 'PAUSED' | 'ERROR';
@@ -256,12 +341,16 @@ export interface Agent {
 
 export interface AgentRun {
   id: string;
-  agentId: string;
-  projectId: string;
+  agentType: string;
+  projectId: string | null;
   status: string;
-  startedAt: string;
+  output: Record<string, unknown> | null;
+  errorMessage: string | null;
+  tokensUsed: number | null;
+  costUsd: number | null;
+  startedAt: string | null;
   completedAt: string | null;
-  result: Record<string, unknown> | null;
+  createdAt: string;
 }
 
 // ===== Integrations / Webhooks =====
@@ -305,6 +394,7 @@ export interface ApiKey {
   id: string;
   name: string;
   key: string;
+  prefix: string;
   lastUsedAt: string | null;
   createdAt: string;
 }

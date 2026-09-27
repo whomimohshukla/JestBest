@@ -6,6 +6,11 @@ export {
   requestResetPasswordSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  verifyTwoFactorSchema,
+  setupTwoFactorSchema,
+  enableTwoFactorSchema,
+  disableTwoFactorSchema,
+  suspendAccountSchema,
   type RegisterInput,
   type LoginInput,
   type RefreshTokenInput,
@@ -36,6 +41,7 @@ export {
   scanApplicationSchema,
   type CreateApplicationInput,
 } from './application.validator';
+export { applicationScanParamsSchema } from './applicationScan.validator';
 export {
   createTestCaseSchema,
   updateTestCaseSchema,
@@ -89,3 +95,8 @@ export {
   testWebhookSchema,
   type CreateWebhookInput,
 } from './webhook.validator';
+export {
+  updateSubscriptionPlanSchema,
+  updateSubscriptionStatusSchema,
+  type UpdateSubscriptionPlanInput,
+} from './billing.validator';

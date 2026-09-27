@@ -17,6 +17,7 @@ export const updateOrganizationSchema = z.object({
   description: z.string().max(500).optional(),
   website: z.string().url().optional(),
   logo: z.string().url().optional(),
+  requireTwoFactor: z.boolean().optional(),
 });
 
 export const inviteMemberSchema = z.object({
