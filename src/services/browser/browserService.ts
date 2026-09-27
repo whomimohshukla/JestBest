@@ -98,7 +98,7 @@ export const browserService = {
     }
   },
   
-  async saveHar(context: BrowserContext): Promise<string | null> {
+  async saveHar(_context: BrowserContext): Promise<string | null> {
     try {
       // HAR is automatically saved when context closes if recordHar was enabled
       // Return the path that was set during context creation

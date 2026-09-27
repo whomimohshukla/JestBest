@@ -1,5 +1,7 @@
 import { env } from '../../config/environment';
 import { logger } from '../../config/logger';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface EmailOptions {
   to: string | string[];
@@ -22,10 +24,10 @@ const EMAIL_STYLES = {
 export const emailService = {
   /**
    * Send email using configured provider
-   * Supports: SendGrid, AWS SES, SMTP
+   * Supports: SendGrid, AWS SES, SMTP, log (console)
    */
   async sendEmail(options: EmailOptions): Promise<void> {
-    const provider = env.EMAIL_PROVIDER || 'smtp';
+    const provider = env.EMAIL_PROVIDER || 'log';
     
     logger.info({ to: options.to, subject: options.subject, provider }, 'Sending email');
     
@@ -34,8 +36,10 @@ export const emailService = {
         await this.sendViaSendGrid(options);
       } else if (provider === 'ses') {
         await this.sendViaSES(options);
-      } else {
+      } else if (provider === 'smtp') {
         await this.sendViaSMTP(options);
+      } else {
+        await this.sendViaLog(options);
       }
       
       logger.info({ to: options.to }, 'Email sent successfully');
@@ -84,16 +88,41 @@ export const emailService = {
     }
   },
   
-  async sendViaSES(options: EmailOptions): Promise<void> {
+  async sendViaSES(_options: EmailOptions): Promise<void> {
     // AWS SES integration would go here
     // For now, throw an error
     throw new Error('AWS SES not yet implemented');
   },
   
-  async sendViaSMTP(options: EmailOptions): Promise<void> {
+  async sendViaSMTP(_options: EmailOptions): Promise<void> {
     // SMTP integration would go here
     // For now, just log
     logger.warn('SMTP email sending not implemented, email not sent');
+  },
+
+  async sendViaLog(options: EmailOptions): Promise<void> {
+    const to = Array.isArray(options.to) ? options.to.join(', ') : options.to;
+    // eslint-disable-next-line no-console
+    console.log(
+      '\n' +
+      '='.repeat(72) + '\n' +
+      '   VERIBOT OUTGOING EMAIL (log provider)\n' +
+      '='.repeat(72) + '\n' +
+      `   To:      ${to}\n` +
+      `   Subject: ${options.subject}\n` +
+      '-'.repeat(72) + '\n' +
+      `${options.text ?? options.html}\n` +
+      '='.repeat(72) + '\n'
+    );
+
+    // Persist to a dev inbox file so links are easy to grab during development
+    try {
+      const inboxPath = path.resolve(process.cwd(), env.EMAIL_INBOX_FILE);
+      const entry = `[${new Date().toISOString()}] ${options.subject} -> ${to}\n${options.text ?? options.html}\n\n`;
+      fs.appendFileSync(inboxPath, entry);
+    } catch (error) {
+      logger.warn({ error }, 'Failed to append email to dev inbox file');
+    }
   },
   
   /**

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   createOrganization,
+  listOrganizations,
   getOrganization,
   updateOrganization,
   deleteOrganization,
@@ -26,7 +27,13 @@ const router = Router();
 router.use(authenticate());
 
 router.post('/', validate(createOrganizationSchema), createOrganization);
-router.get('/:organizationId', validate(getOrganizationParamsSchema, 'params'), getOrganization);
+router.get('/', listOrganizations);
+router.get(
+  '/:organizationId',
+  requirePermission(Permissions.ORG_MANAGE),
+  validate(getOrganizationParamsSchema, 'params'),
+  getOrganization
+);
 router.patch(
   '/:organizationId',
   requirePermission(Permissions.ORG_MANAGE),

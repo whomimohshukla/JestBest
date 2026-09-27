@@ -21,6 +21,23 @@ type SuiteWithItems = Prisma.TestSuiteGetPayload<{
   };
 }>;
 
+const toApiSuite = (suite: SuiteWithItems) => ({
+  id: suite.id,
+  projectId: suite.projectId,
+  name: suite.name,
+  description: suite.description,
+  type: suite.type,
+  createdAt: suite.createdAt,
+  updatedAt: suite.updatedAt,
+  testCases: suite.testSuiteItems.map((item) => item.testCase),
+  items: suite.testSuiteItems.map((item) => ({
+    id: item.id,
+    testCaseId: item.testCaseId,
+    order: item.order,
+  })),
+  _count: { testCases: suite.testSuiteItems.length },
+});
+
 export interface GenerateTestsParams {
   applicationId: string;
   projectId: string;
@@ -110,14 +127,6 @@ export const testCaseService = {
   },
 
   async createSuite(params: CreateSuiteParams): Promise<TestSuite> {
-    if (params.testCaseIds.length === 0) {
-      throw new BadRequestError('Select at least one test case for the suite.');
-    }
-    const tests = await testCaseRepository.listByIds(params.testCaseIds);
-    if (tests.length !== params.testCaseIds.length) {
-      throw new BadRequestError('One or more test cases do not exist.');
-    }
-
     const suite = await testCaseRepository.createSuite({
       projectId: params.projectId,
       name: params.name,
@@ -125,10 +134,16 @@ export const testCaseService = {
       type: params.type ?? 'custom',
     });
 
-    await testCaseRepository.addSuiteItems(
-      suite.id,
-      params.testCaseIds.map((testCaseId, index) => ({ testCaseId, order: index }))
-    );
+    if (params.testCaseIds.length > 0) {
+      const tests = await testCaseRepository.listByIds(params.testCaseIds);
+      if (tests.length !== params.testCaseIds.length) {
+        throw new BadRequestError('One or more test cases do not exist.');
+      }
+      await testCaseRepository.addSuiteItems(
+        suite.id,
+        params.testCaseIds.map((testCaseId, index) => ({ testCaseId, order: index }))
+      );
+    }
 
     return suite;
   },
@@ -141,13 +156,17 @@ export const testCaseService = {
     return suite;
   },
 
-  async listSuites(projectId: string, page = 1, pageSize = 20): Promise<ListResponse<TestSuite>> {
+  async getApiSuite(suiteId: string) {
+    return toApiSuite(await testCaseService.getSuite(suiteId));
+  },
+
+  async listSuites(projectId: string, page = 1, pageSize = 20): Promise<ListResponse<ReturnType<typeof toApiSuite>>> {
     const skip = (page - 1) * pageSize;
     const [items, total] = await Promise.all([
       testCaseRepository.listSuites(projectId, skip, pageSize),
       testCaseRepository.countSuites(projectId),
     ]);
-    return pagination(items, total, { page, pageSize });
+    return pagination(items.map(toApiSuite), total, { page, pageSize });
   },
 
   async updateSuite(suiteId: string, params: Prisma.TestSuiteUpdateInput): Promise<TestSuite> {

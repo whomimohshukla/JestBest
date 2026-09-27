@@ -8,6 +8,7 @@ import { usageService } from '../billing/usageService';
 import { logger } from '../../config/logger';
 import { aiQueue } from '../../queues/aiQueue';
 import { webhookService } from '../webhook/webhookService';
+import { notificationService } from '../notification/notificationService';
 import type { TestStep } from '../../types/domain.types';
 
 export interface ExecutionContext {
@@ -109,12 +110,27 @@ export const testExecutionService = {
       }
     );
 
+    const totalTests = results.length;
+    await notificationService.notifyTestRunCompleted({
+      id: context.testRunId,
+      projectId: context.projectId,
+      status: finalStatus,
+      totalTests,
+      passedTests,
+      failedTests: failedCount,
+      duration: Date.now() - startedAt,
+    });
+
     logger.info({ testRunId: context.testRunId, passedTests, failedTests: failedCount }, 'test run finished');
   },
 
   async executeTestCase(testCase: TestCase, testRun: TestRun, context: ExecutionContext) {
     const steps = (testCase.steps as unknown as TestStep[]) ?? [];
-    const baseUrl = testRun.environmentId ? await getEnvironmentUrl(testRun.environmentId) : undefined;
+    const baseUrl = testRun.environmentId
+      ? await getEnvironmentUrl(testRun.environmentId)
+      : testCase.applicationId
+        ? await getApplicationUrl(testCase.applicationId)
+        : undefined;
 
     const browserContext = await browserService.newContext();
     const page = await browserContext.newPage();
@@ -138,7 +154,7 @@ export const testExecutionService = {
             : [{ action: 'goto', value: baseUrl ?? '' }, ...steps];
 
       const startedAt = Date.now();
-      const results = await pageService.runSteps(page, effectiveSteps);
+      const results = await pageService.runSteps(page, effectiveSteps, baseUrl);
       const failedStep = results.find((r) => !r.success);
 
       const screenshotPath = failedStep ? `/tmp/veribot-${context.testRunId}-${testCase.id}.png` : null;
@@ -179,4 +195,9 @@ export const testExecutionService = {
 const getEnvironmentUrl = async (environmentId: string): Promise<string | undefined> => {
   const environment = await prisma.environment.findUnique({ where: { id: environmentId } });
   return environment?.url;
+};
+
+const getApplicationUrl = async (applicationId: string): Promise<string | undefined> => {
+  const application = await prisma.application.findUnique({ where: { id: applicationId } });
+  return application?.baseUrl || undefined;
 };

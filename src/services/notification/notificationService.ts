@@ -72,10 +72,12 @@ export const notificationService = {
     inviterName: string;
     organizationName: string;
     role: string;
-    invitationToken: string;
+    invitationToken?: string;
   }): Promise<void> {
     try {
-      const invitationUrl = `${env.APP_ORIGIN}/invitations/accept?token=${invitation.invitationToken}`;
+      const invitationUrl = invitation.invitationToken
+        ? `${env.APP_ORIGIN}/invitations/accept?token=${invitation.invitationToken}`
+        : `${env.APP_ORIGIN}/auth/login`;
       
       await emailService.sendTeamInvitationEmail(invitation.email, {
         inviterName: invitation.inviterName,
@@ -121,7 +123,7 @@ export const notificationService = {
       
       if (!project) return;
       
-      const testRunUrl = `${env.APP_ORIGIN}/test-runs/${testRun.id}`;
+      const testRunUrl = `${env.APP_ORIGIN}/runs/${testRun.id}`;
       
       // Get failed test details if there are failures
       let failedTests: Array<{ title: string; errorMessage?: string }> = [];

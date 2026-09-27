@@ -92,6 +92,10 @@ export const applicationService = {
     return applicationRepository.listByProject(projectId);
   },
 
+  async listByOrganization(organizationId: string): Promise<Application[]> {
+    return applicationRepository.listByOrganization(organizationId);
+  },
+
   async assertProjectAccess(organizationId: string, applicationId: string): Promise<Application> {
     const application = await applicationRepository.findById(applicationId);
     if (!application) {

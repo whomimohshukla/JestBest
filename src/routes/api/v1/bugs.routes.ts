@@ -9,6 +9,7 @@ import {
   addBugComment,
   listBugComments,
   listBugs,
+  raiseOnGithub,
 } from '../../../controllers/bugs';
 import { authenticate, tenantMiddleware, validate, requirePermission } from '../../../middleware';
 import { Permissions } from '../../../constants/permissions';
@@ -55,6 +56,12 @@ router.patch(
   validate(bugParamsSchema, 'params'),
   validate(assignBugSchema),
   assignBug
+);
+router.post(
+  '/:bugId/raise-github',
+  requirePermission(Permissions.BUG_UPDATE),
+  validate(bugParamsSchema, 'params'),
+  raiseOnGithub
 );
 router.post(
   '/:bugId/comments',

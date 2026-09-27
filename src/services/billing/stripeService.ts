@@ -1,5 +1,7 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
+
 import { ensureStripeConfigured, throwStripeError } from './billingService';
-import { UpstreamError } from '../../utils/errors';
+import { UpstreamError, UnauthorizedError } from '../../utils/errors';
 
 export interface StripeCustomer {
   customerId: string;
@@ -185,9 +187,49 @@ export const stripeService = {
     return { url: result.url };
   },
   
-  async handleWebhook(payload: string, signature: string): Promise<any> {
-    // In production, use Stripe SDK to verify webhook signature
-    // For now, just parse the payload
+  /**
+   * Verify a Stripe webhook signature and return the parsed event.
+   *
+   * Stripe signs `${timestamp}.${payload}` with HMAC-SHA256 using the endpoint
+   * secret and sends it as `Stripe-Signature: t=<ts>,v1=<hex>[,v1=<hex>...]`.
+   * Verification is mandatory: without it anyone able to reach this endpoint
+   * could forge subscription events and grant themselves a paid plan.
+   */
+  async handleWebhook(payload: string, signature: string): Promise<unknown> {
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!secret) {
+      throw new UpstreamError('Stripe webhook secret is not configured');
+    }
+
+    const parts = signature.split(',');
+    let timestamp: number | undefined;
+    const received: string[] = [];
+    for (const part of parts) {
+      const [key, value] = part.split('=');
+      if (key === 't' && value) timestamp = Number.parseInt(value, 10);
+      if (key === 'v1' && value) received.push(value);
+    }
+    if (timestamp === undefined || Number.isNaN(timestamp) || received.length === 0) {
+      throw new UnauthorizedError('Malformed Stripe-Signature header');
+    }
+
+    // Reject replays of an old, otherwise valid, signature.
+    const toleranceSeconds = 300;
+    if (Math.abs(Date.now() / 1000 - timestamp) > toleranceSeconds) {
+      throw new UnauthorizedError('Stripe signature timestamp is outside the tolerance window');
+    }
+
+    const expected = createHmac('sha256', secret)
+      .update(`${timestamp}.${payload}`, 'utf8')
+      .digest('hex');
+    const matches = received.some(
+      (candidate) =>
+        candidate.length === expected.length && timingSafeEqual(Buffer.from(candidate), Buffer.from(expected))
+    );
+    if (!matches) {
+      throw new UnauthorizedError('Stripe signature verification failed');
+    }
+
     try {
       return JSON.parse(payload);
     } catch {

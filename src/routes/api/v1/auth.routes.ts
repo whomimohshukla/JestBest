@@ -7,6 +7,7 @@ import {
   requestResetPassword,
   resetPassword,
   verifyEmail as verifyEmailController,
+  verifyTwoFactor as verifyTwoFactorController,
   resendVerification as resendVerificationController,
   oauthCallback,
   oauthAuthorize,
@@ -18,6 +19,7 @@ import {
   requestResetPasswordSchema,
   resetPasswordSchema,
   verifyEmailSchema,
+  verifyTwoFactorSchema,
 } from '../../../validators';
 import { validate } from '../../../middleware';
 import { authRateLimiter, authenticate } from '../../../middleware';
@@ -30,6 +32,7 @@ router.post('/login', authRateLimiter, validate(loginSchema), login);
 router.post('/refresh-token', authRateLimiter, validate(refreshTokenSchema), refreshToken);
 router.post('/logout', authenticate({ optional: true }), logout);
 router.post('/verify-email', validate(verifyEmailSchema), verifyEmailController);
+router.post('/verify-2fa', authRateLimiter, validate(verifyTwoFactorSchema), verifyTwoFactorController);
 router.post(
   '/resend-verification',
   authRateLimiter,

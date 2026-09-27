@@ -4,8 +4,9 @@ import { userRepository } from '../../repositories/user.repository';
 import { NotFoundError, ConflictError, ForbiddenError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
 import { canManageRole } from '../../constants/roles';
-import { toSlug } from '../../utils/helpers';
+import { toSlug, resolveUniqueSlug } from '../../utils/helpers';
 import { logger } from '../../config/logger';
+import { notificationService } from '../notification/notificationService';
 
 export interface CreateOrganizationParams {
   name: string;
@@ -21,6 +22,7 @@ export interface UpdateOrganizationParams {
   description?: string;
   website?: string;
   logo?: string;
+  requireTwoFactor?: boolean;
 }
 
 export interface InviteMemberParams {
@@ -31,15 +33,23 @@ export interface InviteMemberParams {
 }
 
 export const organizationService = {
-  async create(params: CreateOrganizationParams): Promise<Organization> {
-    let slug = params.slug ?? toSlug(params.name);
-    if (!slug) slug = `org-${params.ownerUserId.slice(0, 8)}`;
-    let uniqueSlug = slug;
-    for (let i = 1; i < 20; i++) {
-      const existing = await organizationRepository.findBySlug(uniqueSlug);
-      if (!existing) break;
-      uniqueSlug = `${slug}-${i}`;
+  /**
+   * Every organization-scoped read/write must prove the caller actually belongs to
+   * the organization named in the path. Authorization alone is not enough: the JWT
+   * carries the caller's *own* org, so a member of org A would otherwise pass an
+   * ORG_MANAGE check while mutating org B named in :organizationId.
+   */
+  async assertMembership(organizationId: string, userId: string): Promise<Membership> {
+    const membership = await organizationRepository.findMembership(organizationId, userId);
+    if (!membership) {
+      throw new ForbiddenError(Messages.ORG.MEMBER_NOT_FOUND);
     }
+    return membership;
+  },
+
+  async create(params: CreateOrganizationParams): Promise<Organization> {
+    const slugBase = params.slug ?? (toSlug(params.name) || `org-${params.ownerUserId.slice(0, 8)}`);
+    const uniqueSlug = await resolveUniqueSlug(slugBase, (s) => organizationRepository.slugExists(s));
 
     const organization = await organizationRepository.create({
       name: params.name,
@@ -59,7 +69,8 @@ export const organizationService = {
     return organization;
   },
 
-  async get(organizationId: string): Promise<Organization> {
+  async get(organizationId: string, actorUserId: string): Promise<Organization> {
+    await this.assertMembership(organizationId, actorUserId);
     const organization = await organizationRepository.findById(organizationId);
     if (!organization) {
       throw new NotFoundError(Messages.ORG.NOT_FOUND);
@@ -67,7 +78,12 @@ export const organizationService = {
     return organization;
   },
 
-  async update(organizationId: string, params: UpdateOrganizationParams): Promise<Organization> {
+  async update(
+    organizationId: string,
+    params: UpdateOrganizationParams,
+    actorUserId: string
+  ): Promise<Organization> {
+    await this.assertMembership(organizationId, actorUserId);
     const existing = await organizationRepository.findById(organizationId);
     if (!existing) {
       throw new NotFoundError(Messages.ORG.NOT_FOUND);
@@ -77,10 +93,12 @@ export const organizationService = {
       description: params.description ?? undefined,
       website: params.website ?? undefined,
       logo: params.logo ?? undefined,
+      requireTwoFactor: params.requireTwoFactor ?? undefined,
     });
   },
 
-  async softDelete(organizationId: string): Promise<void> {
+  async softDelete(organizationId: string, actorUserId: string): Promise<void> {
+    await this.assertMembership(organizationId, actorUserId);
     const existing = await organizationRepository.findById(organizationId);
     if (!existing) {
       throw new NotFoundError(Messages.ORG.NOT_FOUND);
@@ -88,7 +106,8 @@ export const organizationService = {
     await organizationRepository.softDelete(organizationId);
   },
 
-  async listMembers(organizationId: string) {
+  async listMembers(organizationId: string, actorUserId: string) {
+    await this.assertMembership(organizationId, actorUserId);
     return organizationRepository.listMembers(organizationId);
   },
 
@@ -119,11 +138,21 @@ export const organizationService = {
       throw new ConflictError(Messages.ORG.MEMBER_NOT_FOUND);
     }
 
-    return organizationRepository.addMember({
+    const added = await organizationRepository.addMember({
       organizationId: params.organizationId,
       userId: user.id,
       role: params.role,
     });
+
+    const inviter = await userRepository.findActiveById(params.invitedByUserId);
+    await notificationService.notifyTeamInvitation({
+      email: user.email,
+      inviterName: inviter?.name || 'A teammate',
+      organizationName: organization.name,
+      role: params.role,
+    });
+
+    return added;
   },
 
   async removeMember(organizationId: string, targetUserId: string, actorUserId: string): Promise<void> {

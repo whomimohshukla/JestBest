@@ -97,7 +97,7 @@ export const projectService = {
       testRunRepository.count({ projectId, status: 'PASSED' }),
       testRunRepository.count({ projectId, status: 'FAILED' }),
       bugRepository.count({ projectId, status: { not: 'CLOSED' } } as Prisma.BugWhereInput),
-      testRunRepository.list(projectId, 0, 10),
+      testRunRepository.list({ projectId }, 0, 10),
     ]);
 
     return {

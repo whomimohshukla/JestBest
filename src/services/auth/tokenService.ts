@@ -1,6 +1,7 @@
 import { randomUUID, randomBytes, createHash } from 'crypto';
 import { signToken, verifyToken } from '../../utils/jwt';
 import { getRedis } from '../../config/redis';
+import { env } from '../../config/environment';
 import { UnauthorizedError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
 import type { JwtPayload, TokenPair } from '../../types/auth.types';
@@ -9,6 +10,8 @@ import type { RoleName } from '../../constants/roles';
 const REFRESH_PREFIX = 'auth:refresh:';
 const USER_TOKENS_PREFIX = 'auth:user-tokens:';
 const BLACKLIST_PREFIX = 'auth:blacklist:';
+const RESET_PREFIX = 'auth:reset:';
+const PASSWORD_EPOCH_PREFIX = 'auth:password-epoch:';
 
 const toNumber = (value: unknown): number => {
   const n = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
@@ -19,6 +22,21 @@ const remainingTtl = (exp?: number): number => {
   if (!exp || !Number.isFinite(exp)) return 15 * 60;
   return Math.max(60, exp - Math.floor(Date.now() / 1000));
 };
+
+/** Keep the password epoch at least as long as the longest access-token TTL. */
+const PASSWORD_EPOCH_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+const expiryToSeconds = (value: string): number => {
+  const match = /^(\d+)\s*([smhd])$/.exec(value.trim());
+  if (!match) return 3600;
+  const n = Number.parseInt(match[1], 10);
+  const unit = match[2];
+  const multiplier = unit === 's' ? 1 : unit === 'm' ? 60 : unit === 'h' ? 3600 : 86400;
+  return Math.max(60, n * multiplier);
+};
+
+const passwordResetTtlSeconds = (): number =>
+  expiryToSeconds(env.PASSWORD_RESET_EXPIRES_IN);
 
 const recordUserToken = async (userId: string, jti: string, ttl: number): Promise<void> => {
   const redis = getRedis();
@@ -146,6 +164,68 @@ export const tokenService = {
     } catch {
       return;
     }
+  },
+
+  /**
+   * Mint a password-reset token.
+   *
+   * The token is purpose-bound (`purpose: 'password-reset'`, empty orgId, no
+   * roles) so it can never be mistaken for a session token, and its jti is
+   * recorded in Redis so it can be consumed exactly once. It deliberately has
+   * its own short expiry rather than borrowing the access-token TTL.
+   */
+  issuePasswordResetToken: async (userId: string): Promise<string> => {
+    const jti = randomUUID();
+    const ttl = passwordResetTtlSeconds();
+    const token = signToken(
+      { sub: userId, orgId: '', roles: [], type: 'access', jti, purpose: 'password-reset' },
+      'access'
+    );
+    await getRedis().set(`${RESET_PREFIX}${jti}`, userId, 'EX', ttl);
+    return token;
+  },
+
+  /**
+   * Validate a reset token and burn it.
+   *
+   * GETDEL is atomic, so two concurrent requests racing with the same link
+   * cannot both succeed. A session access token is rejected here because its
+   * purpose is not 'password-reset' — without this check a leaked access token
+   * could be escalated into a permanent credential change.
+   */
+  consumePasswordResetToken: async (token: string): Promise<string> => {
+    const payload = verifyToken(token, 'access');
+    if (payload.purpose !== 'password-reset' || !payload.jti) {
+      throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+    const userId = await getRedis().getdel(`${RESET_PREFIX}${payload.jti}`);
+    if (!userId) {
+      throw new UnauthorizedError(Messages.AUTH.RESET_TOKEN_USED);
+    }
+    return userId;
+  },
+
+  /**
+   * Record that the password changed at this moment.
+   *
+   * Access tokens issued before this timestamp stop authenticating, which is
+   * what actually revokes a stolen session — refresh tokens are covered
+   * separately by revokeAllForUser, but access tokens are stateless.
+   */
+  markPasswordChanged: async (userId: string): Promise<void> => {
+    await getRedis().set(
+      `${PASSWORD_EPOCH_PREFIX}${userId}`,
+      String(Math.floor(Date.now() / 1000)),
+      'EX',
+      PASSWORD_EPOCH_TTL_SECONDS
+    );
+  },
+
+  /** Epoch seconds of the last password change, or 0 if unknown/expired. */
+  passwordEpoch: async (userId: string): Promise<number> => {
+    const raw = await getRedis().get(`${PASSWORD_EPOCH_PREFIX}${userId}`);
+    const value = Number.parseInt(raw ?? '0', 10);
+    return Number.isFinite(value) ? value : 0;
   },
 
   generateApiKey: (): string => {

@@ -11,7 +11,8 @@ const getClient = (config: IntegrationConfig): GithubClientConfig => {
   if (!token) {
     throw new UpstreamError('GitHub access token is missing.');
   }
-  return { token, baseUrl: config.baseUrl ?? 'https://api.github.com' };
+  const baseUrl = config.baseUrl ?? (config.apiUrl as string | undefined) ?? 'https://api.github.com';
+  return { token, baseUrl };
 };
 
 export interface CreateIssueParams {

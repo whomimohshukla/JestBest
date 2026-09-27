@@ -23,3 +23,20 @@ export {
 } from './bugDetectionAgent';
 export { healingAgent, type HealingInput, type HealingOutput } from './healingAgent';
 export { codeAnalysisAgent, type CodeAnalysisInput, type CodeAnalysisOutput } from './codeAnalysisAgent';
+export { embeddingService, EMBEDDING_DIMENSION, type ProviderHasEmbeddings } from './embeddingService';
+export {
+  knowledgeService,
+  type IncidentKnowledgeInput,
+  type SimilarIncident,
+} from './knowledgeService';
+export {
+  StateGraph,
+  StateGraphBuilder,
+  StateGraphError,
+  type GraphEdge,
+  type GraphNode,
+  type GraphRunResult,
+  type GraphState,
+  type GraphTrace,
+  type NodeId,
+} from './stateGraph';

@@ -1,15 +1,24 @@
 import { signToken, verifyToken } from '../../utils/jwt';
-import { ConflictError, UnauthorizedError } from '../../utils/errors';
+import { ConflictError, ForbiddenError, UnauthorizedError } from '../../utils/errors';
+import { env } from '../../config/environment';
 import { Messages } from '../../constants/messages';
 import { userRepository } from '../../repositories/user.repository';
 import { organizationRepository } from '../../repositories/organization.repository';
 import { ROLE_PERMISSIONS } from '../../constants/roles';
 import { passwordService } from './passwordService';
 import { tokenService } from './tokenService';
-import { toSlug } from '../../utils/helpers';
-import { env } from '../../config/environment';
+import { toSlug, resolveUniqueSlug } from '../../utils/helpers';
+import { notificationService } from '../notification/notificationService';
 import type { MembershipRole } from '@prisma/client';
-import type { TokenPair, AuthUser, PublicUser, JwtPayload } from '../../types/auth.types';
+import type {
+  TokenPair,
+  AuthUser,
+  PublicUser,
+  JwtPayload,
+  LoginResult,
+  TwoFactorAuthResult,
+  VerificationRequiredAuthResult,
+} from '../../types/auth.types';
 
 export interface RegisterParams {
   email: string;
@@ -25,7 +34,7 @@ export interface LoginParams {
 
 export interface AuthResult {
   user: PublicUser;
-  organization: { id: string; name: string; slug: string };
+  organization: { id: string; name: string; slug: string; requireTwoFactor: boolean };
   tokens: TokenPair;
 }
 
@@ -36,6 +45,8 @@ const toPublicUser = (user: {
   avatar: string | null;
   emailVerified: Date | null;
   createdAt: Date;
+  twoFactorEnabled?: boolean;
+  suspendedUntil?: Date | null;
 }): PublicUser => {
   return {
     id: user.id,
@@ -44,11 +55,13 @@ const toPublicUser = (user: {
     avatar: user.avatar,
     emailVerified: user.emailVerified !== null,
     createdAt: user.createdAt,
+    twoFactorEnabled: user.twoFactorEnabled ?? false,
+    suspendedUntil: user.suspendedUntil ?? null,
   };
 };
 
 export const authService = {
-  async register(params: RegisterParams, ipAddress?: string): Promise<AuthResult> {
+  async register(params: RegisterParams): Promise<AuthResult | VerificationRequiredAuthResult> {
     const existing = await userRepository.findActiveByEmail(params.email);
     if (existing) {
       throw new ConflictError(Messages.AUTH.EMAIL_IN_USE);
@@ -62,16 +75,8 @@ export const authService = {
     });
 
     const orgName = params.organizationName ?? `${params.name ?? 'My'} Workspace`;
-    let slug = toSlug(orgName);
-    if (!slug) {
-      slug = `org-${user.id.slice(0, 8)}`;
-    }
-    let uniqueSlug = slug;
-    for (let i = 1; i < 10; i++) {
-      const existingOrg = await organizationRepository.findBySlug(uniqueSlug);
-      if (!existingOrg) break;
-      uniqueSlug = `${slug}-${i}`;
-    }
+    const slugBase = toSlug(orgName) || `org-${user.id.slice(0, 8)}`;
+    const uniqueSlug = await resolveUniqueSlug(slugBase, (s) => organizationRepository.slugExists(s));
 
     const organization = await organizationRepository.create({
       name: orgName,
@@ -88,10 +93,21 @@ export const authService = {
     await billingService.getOrCreate(organization.id);
 
     const verificationToken = signToken(
-      { sub: user.id, orgId: organization.id, roles: ['OWNER'], type: 'access' },
+      { sub: user.id, orgId: organization.id, roles: ['OWNER'], type: 'access', purpose: 'verification' },
       'access'
     );
-    await sendVerificationEmail(user.email, verificationToken, ipAddress);
+    await notificationService.notifyEmailVerification(user, verificationToken);
+
+    const baseOrg = { id: organization.id, name: organization.name, slug: organization.slug, requireTwoFactor: false };
+
+    if (env.REQUIRE_EMAIL_VERIFICATION) {
+      return {
+        user: toPublicUser(user),
+        organization: baseOrg,
+        verificationRequired: true,
+        verificationToken,
+      } satisfies VerificationRequiredAuthResult;
+    }
 
     const tokens = await tokenService.issue({
       userId: user.id,
@@ -101,15 +117,19 @@ export const authService = {
 
     return {
       user: toPublicUser(user),
-      organization: { id: organization.id, name: organization.name, slug: organization.slug },
+      organization: baseOrg,
       tokens,
     };
   },
 
-  async login(params: LoginParams): Promise<AuthResult> {
+  async login(params: LoginParams): Promise<LoginResult> {
     const user = await userRepository.findActiveByEmail(params.email);
     if (!user || !user.passwordHash) {
       throw new UnauthorizedError(Messages.AUTH.INVALID_CREDENTIALS);
+    }
+
+    if (user.suspendedUntil && user.suspendedUntil.getTime() > Date.now()) {
+      throw new ForbiddenError(Messages.AUTH.ACCOUNT_SUSPENDED_UNTIL(user.suspendedUntil.toISOString()));
     }
 
     const valid = await passwordService.verify(params.password, user.passwordHash);
@@ -130,6 +150,53 @@ export const authService = {
     const permissionRoles: MembershipRole[] = [membership.role];
     const roles = permissionRoles;
 
+    if (env.REQUIRE_EMAIL_VERIFICATION && !user.emailVerified) {
+      const verificationToken = signToken(
+        { sub: user.id, orgId: org.id, roles, type: 'access', purpose: 'verification' },
+        'access'
+      );
+      return {
+        verificationRequired: true,
+        verificationToken,
+        user: toPublicUser(user),
+        organization: { id: org.id, name: org.name, slug: org.slug, requireTwoFactor: org.requireTwoFactor },
+      } satisfies VerificationRequiredAuthResult;
+    }
+
+    if (user.twoFactorEnabled) {
+      const twoFactorToken = signToken(
+        { sub: user.id, orgId: org.id, roles, type: 'access', purpose: '2fa' },
+        'access'
+      );
+      return {
+        requiresTwoFactor: true,
+        twoFactorToken,
+        user: toPublicUser(user),
+        organization: { id: org.id, name: org.name, slug: org.slug, requireTwoFactor: org.requireTwoFactor },
+      } satisfies TwoFactorAuthResult;
+    }
+
+    if (org.requireTwoFactor) {
+      const { twoFactorService } = await import('./twoFactorService');
+      const secret = user.twoFactorSecret ?? twoFactorService.generateSecret();
+      if (!user.twoFactorSecret) {
+        await userRepository.update(user.id, { twoFactorSecret: secret });
+      }
+      const otpauthUrl = twoFactorService.generateOtpauthUrl(secret, user.email);
+      const qrDataUrl = await twoFactorService.generateQrDataUrl(secret, user.email);
+      const twoFactorToken = signToken(
+        { sub: user.id, orgId: org.id, roles, type: 'access', purpose: '2fa' },
+        'access'
+      );
+      return {
+        requiresTwoFactor: true,
+        twoFactorToken,
+        user: toPublicUser(user),
+        organization: { id: org.id, name: org.name, slug: org.slug, requireTwoFactor: org.requireTwoFactor },
+        setup: { secret, otpauthUrl, qrDataUrl },
+      } satisfies TwoFactorAuthResult;
+    }
+
     const tokens = await tokenService.issue({
       userId: user.id,
       orgId: org.id,
@@ -138,7 +205,51 @@ export const authService = {
 
     return {
       user: toPublicUser(user),
-      organization: { id: org.id, name: org.name, slug: org.slug },
+      organization: { id: org.id, name: org.name, slug: org.slug, requireTwoFactor: org.requireTwoFactor },
+      tokens,
+    };
+  },
+
+  async verifyTwoFactor(twoFactorToken: string, code: string): Promise<AuthResult> {
+    const payload = verifyToken(twoFactorToken, 'access');
+    if (payload.purpose !== '2fa') {
+      throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+
+    const user = await userRepository.findActiveById(payload.sub);
+    if (!user || !user.twoFactorSecret) {
+      throw new UnauthorizedError(Messages.AUTH.TWO_FACTOR_NOT_ENABLED);
+    }
+    if (user.suspendedUntil && user.suspendedUntil.getTime() > Date.now()) {
+      throw new ForbiddenError(Messages.AUTH.ACCOUNT_SUSPENDED_UNTIL(user.suspendedUntil.toISOString()));
+    }
+
+    const { twoFactorService } = await import('./twoFactorService');
+    if (!twoFactorService.verify(user.twoFactorSecret, code)) {
+      throw new UnauthorizedError(Messages.AUTH.TWO_FACTOR_INVALID);
+    }
+
+    if (!user.twoFactorEnabled) {
+      await userRepository.update(user.id, { twoFactorEnabled: true });
+      user.twoFactorEnabled = true;
+    }
+
+    const membership = await organizationRepository.findMembership(payload.orgId, user.id);
+    const org = await organizationRepository.findById(payload.orgId);
+    if (!membership || !org) {
+      throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+
+    const roles: MembershipRole[] = [membership.role];
+    const tokens = await tokenService.issue({
+      userId: user.id,
+      orgId: org.id,
+      roles,
+    });
+
+    return {
+      user: toPublicUser(user),
+      organization: { id: org.id, name: org.name, slug: org.slug, requireTwoFactor: org.requireTwoFactor },
       tokens,
     };
   },
@@ -183,7 +294,7 @@ export const authService = {
       throw new ConflictError(Messages.AUTH.EMAIL_ALREADY_VERIFIED);
     }
     const token = signToken({ sub: user.id, type: 'verification' } as unknown as JwtPayload, 'access');
-    await sendVerificationEmail(user.email, token);
+    await notificationService.notifyEmailVerification(user, token);
   },
 
   async buildAuthUser(userId: string, orgId: string): Promise<AuthUser> {
@@ -207,12 +318,4 @@ export const authService = {
       permissions,
     };
   },
-};
-
-const sendVerificationEmail = async (email: string, token: string, ipAddress?: string): Promise<void> => {
-  const url = `${env.APP_ORIGIN}/verify-email?token=${token}`;
-  if (env.NODE_ENV === 'development' || env.NODE_ENV === 'test') {
-    console.log(`[email:dev] verification link for ${email}: ${url}`);
-  }
-  void ipAddress;
 };

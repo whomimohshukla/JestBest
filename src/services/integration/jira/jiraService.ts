@@ -93,7 +93,7 @@ export const jiraService = {
     if (bug.reproductionSteps) {
       if (Array.isArray(bug.reproductionSteps)) {
         reproSteps = bug.reproductionSteps
-          .map((step: any, idx: number) => `# ${step.action || step}`)
+          .map((step: any) => `# ${step.action || step}`)
           .join('\n');
       } else if (typeof bug.reproductionSteps === 'string') {
         reproSteps = bug.reproductionSteps;

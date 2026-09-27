@@ -1,4 +1,5 @@
 import { llmService, type LlmMessage } from './llmService';
+import { knowledgeService } from './knowledgeService';
 import type { AgentContext, AgentResult } from './agentService';
 
 export interface FailureAnalyzerInput {
@@ -25,12 +26,24 @@ export interface FailureAnalyzerOutput {
   analysis: FailureAnalysis;
 }
 
-const buildPrompt = (input: FailureAnalyzerInput): LlmMessage[] => {
+const buildPrompt = (
+  input: FailureAnalyzerInput,
+  similar: Array<{ title: string; errorMessage: string | null; rootCause: string | null; suggestedFix: string | null; similarity: number }> = []
+): LlmMessage[] => {
+  const systemRead =
+    'You are an expert QA failure analysis agent. Analyze the test failure data and produce a precise root-cause analysis as JSON with keys: rootCause, category, confidence, evidence, suggestedFix, relatedSelectors.';
+  const systemRag =
+    similar.length > 0
+      ? [
+          '\n\nRetrieval-augmented knowledge from historically similar past failures (use these as a strong prior, but trust the current failure data):',
+          JSON.stringify(similar, null, 2),
+        ].join('\n')
+      : '';
+
   return [
     {
       role: 'system',
-      content:
-        'You are an expert QA failure analysis agent. Analyze the test failure data and produce a precise root-cause analysis as JSON with keys: rootCause, category, confidence, evidence, suggestedFix, relatedSelectors.',
+      content: systemRead + systemRag,
     },
     {
       role: 'user',
@@ -58,7 +71,19 @@ export const failureAnalyzerAgent = {
     context: AgentContext,
     input: FailureAnalyzerInput
   ): Promise<AgentResult<FailureAnalyzerOutput>> {
-    const messages = buildPrompt(input);
+    const similarityQuery = [input.testTitle, input.errorMessage, input.stackTrace]
+      .filter(Boolean)
+      .join('\n');
+    const similar =
+      context.organizationId && similarityQuery
+        ? await knowledgeService.retrieveSimilar({
+            organizationId: context.organizationId,
+            query: similarityQuery,
+            limit: 3,
+          })
+        : [];
+
+    const messages = buildPrompt(input, similar);
 
     if (!llmService.isConfigured()) {
       return {
@@ -69,13 +94,28 @@ export const failureAnalyzerAgent = {
     }
 
     const response = await llmService.chatJson<FailureAnalyzerOutput>(messages);
+    const analysis = {
+      ...fallbackAnalysis(input),
+      ...response.data.analysis,
+    };
+
+    if (context.organizationId) {
+      await knowledgeService.index({
+        organizationId: context.organizationId,
+        projectId: context.projectId,
+        testCaseId: context.testCaseId,
+        testRunId: context.testRunId,
+        title: input.testTitle ?? input.errorMessage?.slice(0, 120) ?? 'Test failure',
+        errorMessage: input.errorMessage,
+        rootCause: analysis.rootCause,
+        suggestedFix: analysis.suggestedFix,
+        category: analysis.category,
+        metadata: { source: 'failure_analyzer', similarIds: similar.map((s) => s.id) },
+      });
+    }
+
     return {
-      output: {
-        analysis: {
-          ...fallbackAnalysis(input),
-          ...response.data.analysis,
-        },
-      },
+      output: { analysis },
       usage: response.usage,
       messages,
     };
