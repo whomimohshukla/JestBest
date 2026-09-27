@@ -5,6 +5,7 @@ import { UnauthorizedError, ForbiddenError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
 import { created } from '../../utils/formatters';
 import { prisma } from '../../config/database';
+import { notificationService } from '../../services/notification/notificationService';
 
 export const createBug = async (req: Request, res: Response): Promise<void> => {
   if (!req.user || !req.orgId) {
@@ -71,5 +72,14 @@ export const createBug = async (req: Request, res: Response): Promise<void> => {
     },
     req
   );
+  await notificationService.notifyBugCreated({
+    id: bug.id,
+    title: bug.title,
+    description: bug.description,
+    severity: bug.severity,
+    priority: bug.priority,
+    projectId: bug.projectId,
+    organizationId: req.orgId,
+  });
   res.status(201).json(created(bug, { message: Messages.BUG.CREATED }));
 };

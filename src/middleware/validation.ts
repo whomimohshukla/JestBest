@@ -24,7 +24,7 @@ const getSourceData = (req: Request, source: ValidationSource): unknown => {
     case 'params':
       return req.params;
     default:
-      return req.body;
+      return req.body ?? {};
   }
 };
 
@@ -39,8 +39,16 @@ const setSourceData = (req: Request, source: ValidationSource, data: unknown): v
       });
       break;
     case 'params':
+      // Merge rather than replace. Path parameters are declared by the router,
+      // not the client, and a Zod object schema strips keys it does not know
+      // about. Replacing outright would delete e.g. :userId when an earlier
+      // middleware validated a schema containing only :organizationId, breaking
+      // any route that validates params more than once.
       Object.defineProperty(req, 'params', {
-        value: data as Record<string, string>,
+        value: {
+          ...(req.params as Record<string, string>),
+          ...(data as Record<string, string>),
+        },
         enumerable: true,
         configurable: true,
         writable: true,

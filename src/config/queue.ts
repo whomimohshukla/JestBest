@@ -8,7 +8,13 @@ export const queueConnection: ConnectionOptions = {
   enableReadyCheck: false,
 };
 
-export const queuePrefix = 'veribot:queues';
+/**
+ * Namespaced per environment so a test run never shares BullMQ state with a
+ * locally running dev server: without this, dev workers pick up jobs enqueued
+ * by the test suite (and vice versa), which points the jobs at the wrong
+ * database and shows up as unexplained multi-second stalls.
+ */
+export const queuePrefix = `veribot:queues:${env.NODE_ENV ?? 'development'}`;
 
 export const defaultJobOptions = {
   attempts: 3,

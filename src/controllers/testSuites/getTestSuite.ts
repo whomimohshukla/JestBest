@@ -12,5 +12,6 @@ export const getTestSuite = async (req: Request, res: Response): Promise<void> =
   if (req.orgId && project?.organizationId !== req.orgId) {
     throw new ForbiddenError(Messages.AUTH.FORBIDDEN);
   }
-  res.status(200).json(ok(suite));
+  const apiSuite = await testCaseService.getApiSuite(testSuiteId);
+  res.status(200).json(ok(apiSuite));
 };

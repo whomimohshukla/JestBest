@@ -3,7 +3,7 @@ import { oauthService } from '../../services/auth/oauthService';
 import { tokenService } from '../../services/auth/tokenService';
 import { userRepository } from '../../repositories/user.repository';
 import { organizationRepository } from '../../repositories/organization.repository';
-import { toSlug } from '../../utils/helpers';
+import { toSlug, resolveUniqueSlug } from '../../utils/helpers';
 import { auditService } from '../../services/audit/auditTrailService';
 import { logger } from '../../config/logger';
 import { env } from '../../config/environment';
@@ -31,19 +31,26 @@ export const oauthCallback = async (req: Request, res: Response): Promise<void> 
   const { code, error, error_description } = req.query;
   const { provider } = req.params as { provider: string };
 
+  const fail = (code: string, message: string, status = 400) => {
+    res.status(status).json({
+      success: false,
+      error: { code, message },
+    });
+  };
+
   if (error) {
     logger.warn({ provider, error, error_description }, 'OAuth error callback');
-    res.status(400).json({ success: false, message: String(error_description || error) });
+    fail('oauth_error', String(error_description || error));
     return;
   }
 
   if (!code || typeof code !== 'string') {
-    res.status(400).json({ success: false, message: Messages.AUTH.INVALID_TOKEN });
+    fail('invalid_request', Messages.AUTH.INVALID_TOKEN);
     return;
   }
 
   if (provider !== 'github') {
-    res.status(400).json({ success: false, message: `Provider '${provider}' is not supported` });
+    fail('unsupported_provider', `Provider '${provider}' is not supported`);
     return;
   }
 
@@ -55,14 +62,8 @@ export const oauthCallback = async (req: Request, res: Response): Promise<void> 
   let membership = await organizationRepository.findMembershipByUser(user.id);
   if (!membership) {
     const orgName = `${profile.name ?? 'My'} Workspace`;
-    let slug = toSlug(orgName);
-    if (!slug) slug = `org-${user.id.slice(0, 8)}`;
-    let uniqueSlug = slug;
-    for (let i = 1; i < 10; i++) {
-      const existing = await organizationRepository.findBySlug(uniqueSlug);
-      if (!existing) break;
-      uniqueSlug = `${slug}-${i}`;
-    }
+    const slugBase = toSlug(orgName) || `org-${user.id.slice(0, 8)}`;
+    const uniqueSlug = await resolveUniqueSlug(slugBase, (s) => organizationRepository.slugExists(s));
 
     const organization = await organizationRepository.create({ name: orgName, slug: uniqueSlug });
     await organizationRepository.addMember({

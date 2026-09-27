@@ -1,4 +1,5 @@
 export { createOrganization } from './createOrganization';
+export { listOrganizations } from './listOrganizations';
 export { getOrganization } from './getOrganization';
 export { updateOrganization } from './updateOrganization';
 export { deleteOrganization } from './deleteOrganization';

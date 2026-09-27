@@ -3,6 +3,17 @@ import type { TestStep } from '../../types/domain.types';
 
 const DEFAULT_TIMEOUT = 10000;
 
+const resolveUrl = (value: string | undefined, baseUrl?: string): string => {
+  if (!value) return '';
+  if (!baseUrl) return value;
+  if (/^https?:\/\//i.test(value) || value.startsWith('data:')) return value;
+  try {
+    return new URL(value, baseUrl).toString();
+  } catch {
+    return value;
+  }
+};
+
 export interface StepExecutionResult {
   stepIndex: number;
   action: string;
@@ -11,11 +22,11 @@ export interface StepExecutionResult {
 }
 
 export const pageService = {
-  async runSteps(page: Page, steps: TestStep[]): Promise<StepExecutionResult[]> {
+  async runSteps(page: Page, steps: TestStep[], baseUrl?: string): Promise<StepExecutionResult[]> {
     const results: StepExecutionResult[] = [];
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-      const result = await pageService.executeStep(page, step, i);
+      const result = await pageService.executeStep(page, step, i, baseUrl);
       results.push(result);
       if (!result.success) {
         break;
@@ -24,12 +35,12 @@ export const pageService = {
     return results;
   },
 
-  async executeStep(page: Page, step: TestStep, index: number): Promise<StepExecutionResult> {
+  async executeStep(page: Page, step: TestStep, index: number, baseUrl?: string): Promise<StepExecutionResult> {
     const timeout = step.timeout ?? DEFAULT_TIMEOUT;
     try {
       switch (step.action) {
         case 'goto':
-          await page.goto(step.value ?? '', { waitUntil: 'domcontentloaded', timeout });
+          await page.goto(resolveUrl(step.value, baseUrl), { waitUntil: 'domcontentloaded', timeout });
           break;
         case 'click':
           await page.click(step.selector ?? '', { timeout });

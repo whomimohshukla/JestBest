@@ -21,6 +21,8 @@ export const changePassword = async (req: Request, res: Response): Promise<void>
   }
   const passwordHash = await passwordService.hash(newPassword);
   await userRepository.update(user.id, { passwordHash });
+  // Invalidate access tokens minted before this change, not just refresh tokens.
+  await tokenService.markPasswordChanged(user.id);
   await tokenService.revokeAllForUser(user.id);
   res.status(200).json(ok(null, { message: Messages.AUTH.PASSWORD_RESET }));
 };

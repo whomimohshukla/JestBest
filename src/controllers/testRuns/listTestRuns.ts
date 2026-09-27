@@ -18,7 +18,9 @@ export const listTestRuns = async (req: Request, res: Response): Promise<void> =
     }
   }
   const where: Prisma.TestRunWhereInput = {
-    ...(projectId ? { projectId: projectId as string } : {}),
+    ...(projectId
+      ? { projectId: projectId as string }
+      : { project: { organizationId: req.orgId } }),
     ...(status ? { status: status as Prisma.TestRunWhereInput['status'] } : {}),
   };
   const runs = await testRunService.list(where, Number(page), Number(pageSize));

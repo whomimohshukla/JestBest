@@ -9,12 +9,13 @@ export const runTests = async (req: Request, res: Response): Promise<void> => {
   if (!req.user || !req.orgId) {
     throw new UnauthorizedError(Messages.AUTH.UNAUTHORIZED);
   }
-  const { projectId, testSuiteId, testCaseIds, environmentId, testUserId } = req.body as {
+  const { projectId, testSuiteId, testCaseIds, environmentId, testUserId, triggerType } = req.body as {
     projectId: string;
     testSuiteId?: string;
     testCaseIds?: string[];
     environmentId?: string;
     testUserId?: string;
+    triggerType?: 'MANUAL' | 'SCHEDULED' | 'API' | 'CI';
   };
   const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project || project.organizationId !== req.orgId) {
@@ -28,6 +29,7 @@ export const runTests = async (req: Request, res: Response): Promise<void> => {
     testCaseIds,
     environmentId,
     testUserId,
+    metadata: triggerType ? { triggerType } : undefined,
   });
   res.status(201).json(created(testRun, { message: Messages.TEST.RUN_STARTED }));
 };

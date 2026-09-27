@@ -17,15 +17,15 @@ export const applicationRepository = {
       orderBy: { createdAt: 'desc' },
     }),
 
-  getMap: (id: string) =>
-    prisma.application.findUnique({
-      where: { id },
-      include: {
-        pages: { include: { components: true }, orderBy: { order: 'asc' } },
-        workflows: true,
-        components: true,
-      },
+  listByOrganization: (organizationId: string) =>
+    prisma.application.findMany({
+      where: { project: { organizationId } },
+      include: { project: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
     }),
+
+  getMap: (id?: string | null) =>
+    id ? prisma.application.findUnique({ where: { id }, include: { pages: { include: { components: true }, orderBy: { order: 'asc' } }, workflows: true, components: true } }) : null,
 
   addEnvironment: (data: Prisma.EnvironmentUncheckedCreateInput) => prisma.environment.create({ data }),
 

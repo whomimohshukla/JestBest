@@ -7,14 +7,19 @@ import type { ListResponse } from '../../types/api.types';
 import type { CreateBugInput } from '../../validators/bug.validator';
 import type { DetectedBug } from '../ai/bugDetectionAgent';
 import { webhookService } from '../webhook/webhookService';
+import { githubService } from '../integration/github/githubService';
+import { integrationConfigOf } from '../integration/integrationService';
+import { integrationRepository } from '../../repositories/integration.repository';
+import { logger } from '../../config/logger';
 
 export const bugService = {
-  async create(params: CreateBugInput, organizationId: string, _createdById: string): Promise<Bug> {
+  async create(params: CreateBugInput, organizationId: string, createdById: string): Promise<Bug> {
     const bug = await bugRepository.create({
       projectId: params.projectId,
       organizationId,
       applicationId: params.applicationId,
       testCaseId: params.testCaseId || undefined,
+      createdById,
       title: params.title,
       description: params.description,
       severity: params.severity,
@@ -79,19 +84,20 @@ export const bugService = {
   },
 
   async list(
-    projectId: string,
+    where: Prisma.BugWhereInput,
     page = 1,
     pageSize = 20,
     filters: { status?: string; severity?: string } = {}
   ): Promise<ListResponse<Bug>> {
     const skip = (page - 1) * pageSize;
+    const fullWhere: Prisma.BugWhereInput = {
+      ...where,
+      ...(filters.status ? { status: filters.status as Prisma.BugWhereInput['status'] } : {}),
+      ...(filters.severity ? { severity: filters.severity as Prisma.BugWhereInput['severity'] } : {}),
+    };
     const [items, total] = await Promise.all([
-      bugRepository.list(projectId, skip, pageSize, filters.status, filters.severity),
-      bugRepository.count({
-        projectId,
-        ...(filters.status ? { status: filters.status as Prisma.BugWhereInput['status'] } : {}),
-        ...(filters.severity ? { severity: filters.severity as Prisma.BugWhereInput['severity'] } : {}),
-      }),
+      bugRepository.list(fullWhere, skip, pageSize),
+      bugRepository.count(fullWhere),
     ]);
     return pagination(items, total, { page, pageSize });
   },
@@ -139,5 +145,36 @@ export const bugService = {
       priority: bug.priority,
       status: bug.status,
     });
+
+    // Best-effort: mirror the bug into a connected GitHub repository.
+    // Resolved against the bug's own project so bugs from project A are not
+    // filed into project B's repository.
+    try {
+      const integration = await integrationRepository.findForProject(
+        bug.organizationId,
+        'GITHUB',
+        bug.projectId
+      );
+      const config = integration ? integrationConfigOf(integration) : null;
+      if (!config || !config.token || !config.repository) return;
+
+      const { issueUrl } = await githubService.createBugIssue(
+        config,
+        {
+          title: bug.title,
+          description: bug.description ?? undefined,
+          severity: bug.severity,
+          priority: bug.priority,
+          reproductionSteps: bug.reproductionSteps,
+          expectedBehavior: bug.expectedBehavior ?? undefined,
+          actualBehavior: bug.actualBehavior ?? undefined,
+        },
+        config.repository
+      );
+      await bugRepository.update(bug.id, { githubIssueUrl: issueUrl });
+      logger.info({ bugId: bug.id, issueUrl }, 'Bug mirrored to GitHub issue');
+    } catch (error) {
+      logger.warn({ bugId: bug.id, error }, 'Failed to create GitHub issue for bug');
+    }
   },
 };

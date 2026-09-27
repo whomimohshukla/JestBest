@@ -12,7 +12,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     name?: string;
     organizationName?: string;
   };
-  const result = await authService.register({ email, password, name, organizationName }, req.ip);
+  const result = await authService.register({ email, password, name, organizationName });
   
   // Send welcome email (async, don't wait)
   notificationService.notifyUserRegistered(result.user).catch(() => {

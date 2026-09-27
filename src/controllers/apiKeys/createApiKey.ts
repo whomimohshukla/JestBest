@@ -6,6 +6,18 @@ import { prisma } from '../../config/database';
 import { tokenService } from '../../services/auth/tokenService';
 import { auditService } from '../../services/audit/auditTrailService';
 
+/** Never expose the stored `key` (bcrypt hash) — only the display prefix. */
+const SAFE_API_KEY_FIELDS = {
+  id: true,
+  userId: true,
+  name: true,
+  prefix: true,
+  lastUsedAt: true,
+  expiresAt: true,
+  createdAt: true,
+  revokedAt: true,
+} as const;
+
 export const createApiKey = async (req: Request, res: Response): Promise<void> => {
   if (!req.user) {
     throw new UnauthorizedError(Messages.AUTH.UNAUTHORIZED);
@@ -23,6 +35,7 @@ export const createApiKey = async (req: Request, res: Response): Promise<void> =
       lastUsedAt: null,
       expiresAt: expiresAt ? new Date(expiresAt) : null,
     },
+    select: SAFE_API_KEY_FIELDS,
   });
 
   if (req.orgId) {

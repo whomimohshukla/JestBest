@@ -15,6 +15,6 @@ export const removeSuiteItem = async (req: Request, res: Response): Promise<void
   if (req.orgId && project?.organizationId !== req.orgId) {
     throw new ForbiddenError(Messages.AUTH.FORBIDDEN);
   }
-  const updated = await testCaseService.removeSuiteItem(testSuiteId, suiteItemId);
-  res.status(200).json(ok(updated, { message: Messages.TEST.UPDATED }));
+  await testCaseService.removeSuiteItem(testSuiteId, suiteItemId);
+  res.status(200).json(ok(await testCaseService.getApiSuite(testSuiteId), { message: Messages.TEST.UPDATED }));
 };

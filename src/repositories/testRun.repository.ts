@@ -18,12 +18,9 @@ export const testRunRepository = {
 
   update: (id: string, data: Prisma.TestRunUpdateInput) => prisma.testRun.update({ where: { id }, data }),
 
-  list: (projectId: string, skip = 0, take = 20, status?: string) =>
+  list: (where: Prisma.TestRunWhereInput = {}, skip = 0, take = 20) =>
     prisma.testRun.findMany({
-      where: {
-        projectId,
-        ...(status ? { status: status as Prisma.TestRunWhereInput['status'] } : {}),
-      },
+      where,
       skip,
       take,
       orderBy: { createdAt: 'desc' },

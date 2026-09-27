@@ -42,16 +42,16 @@ export const bugRepository = {
 
   countComments: (bugId: string) => prisma.bugComment.count({ where: { bugId } }),
 
-  list: (projectId: string, skip = 0, take = 20, status?: string, severity?: string) =>
+  list: (where: Prisma.BugWhereInput = {}, skip = 0, take = 20) =>
     prisma.bug.findMany({
-      where: {
-        projectId,
-        ...(status ? { status: status as Prisma.BugWhereInput['status'] } : {}),
-        ...(severity ? { severity: severity as Prisma.BugWhereInput['severity'] } : {}),
-      },
+      where,
       skip,
       take,
       orderBy: { createdAt: 'desc' },
+      include: {
+        assignee: { select: { id: true, name: true, email: true, avatar: true } },
+        creator: { select: { id: true, name: true, email: true, avatar: true } },
+      },
     }),
 
   count: (where: Prisma.BugWhereInput = {}) => prisma.bug.count({ where }),

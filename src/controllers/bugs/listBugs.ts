@@ -4,6 +4,7 @@ import { ForbiddenError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
 import { ok } from '../../utils/formatters';
 import { prisma } from '../../config/database';
+import type { Prisma } from '@prisma/client';
 
 export const listBugs = async (req: Request, res: Response): Promise<void> => {
   const page = Number(req.query.page ?? 1);
@@ -19,6 +20,8 @@ export const listBugs = async (req: Request, res: Response): Promise<void> => {
     }
   }
 
-  const result = projectId ? await bugService.list(projectId, page, pageSize, { status, severity }) : [];
+  const where: Prisma.BugWhereInput =
+    projectId && req.orgId ? { projectId } : { organizationId: req.orgId };
+  const result = await bugService.list(where, page, pageSize, { status, severity });
   res.status(200).json(ok(result));
 };

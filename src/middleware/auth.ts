@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { UnauthorizedError } from '../utils/errors';
+import { UnauthorizedError, ForbiddenError } from '../utils/errors';
 import { Messages } from '../constants/messages';
 import { verifyToken } from '../utils/jwt';
 import { getRedis } from '../config/redis';
@@ -10,6 +10,7 @@ import { ROLE_PERMISSIONS, roleHasPermission } from '../constants/roles';
 
 export interface AuthenticateOptions {
   optional?: boolean;
+  allowSuspended?: boolean;
 }
 
 export const authenticate = (options: AuthenticateOptions = {}) => {
@@ -46,12 +47,28 @@ export const authenticate = (options: AuthenticateOptions = {}) => {
         name: true,
         avatar: true,
         deletedAt: true,
+        suspendedUntil: true,
         memberships: { where: { organizationId: payload.orgId } },
       },
     });
 
     if (!user || user.deletedAt) {
       throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+
+    if (user.suspendedUntil && user.suspendedUntil.getTime() > Date.now() && !options.allowSuspended) {
+      throw new ForbiddenError(Messages.AUTH.ACCOUNT_SUSPENDED_UNTIL(user.suspendedUntil.toISOString()));
+    }
+
+    // A password change (or reset) bumps this epoch, which retroactively
+    // invalidates every access token issued before it. Access tokens are
+    // stateless, so revoking refresh tokens alone would leave a stolen access
+    // token usable until it expired.
+    if (payload.iat) {
+      const epoch = await tokenService.passwordEpoch(payload.sub);
+      if (epoch && payload.iat < epoch) {
+        throw new UnauthorizedError(Messages.AUTH.SESSION_REVOKED);
+      }
     }
 
     const membership = user.memberships[0];
@@ -130,7 +147,10 @@ const authenticateWithApiKey = async (
     };
     req.orgId = orgId;
 
-    void prisma.apiKey.update({ where: { id: record.id }, data: { lastUsedAt: new Date() } });
+    // Awaited rather than fire-and-forget: an unhandled rejection from this
+    // write would otherwise be able to take down the process, and callers that
+    // read the key back expect lastUsedAt to be durable.
+    await prisma.apiKey.update({ where: { id: record.id }, data: { lastUsedAt: new Date() } });
     return next();
   } catch (error) {
     if (options.optional) return next();

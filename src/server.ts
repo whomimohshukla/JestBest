@@ -1,32 +1,15 @@
-import 'reflect-metadata';
-import express from 'express';
 import http from 'http';
 import type { Worker } from 'bullmq';
 
+import { createApp } from './app';
 import { env } from './config/environment';
 import { connectDatabase, disconnectDatabase } from './config/database';
+import { closeRedis } from './config/redis';
+import { closeAllQueues } from './queues';
 import { setupWorkers } from './workers';
-import routes from './routes';
 import { logger } from './config/logger';
-import { apiRateLimiter } from './middleware/rateLimiter';
-import { corsMiddleware, errorHandler, helmetMiddleware, requestId, requestLogger } from './middleware';
 
-const app = express();
-
-app.set('trust proxy', 1);
-app.disable('x-powered-by');
-
-app.use(requestId);
-app.use(helmetMiddleware);
-app.use(corsMiddleware);
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
-app.use(requestLogger);
-
-app.use(apiRateLimiter);
-app.use(routes);
-
-app.use(errorHandler);
+const app = createApp();
 
 let server: http.Server | undefined;
 const workers: Worker[] = [];
@@ -38,6 +21,9 @@ const shutdown = async (signal: string): Promise<void> => {
     server.close();
   }
   await Promise.allSettled(workers.map((worker) => worker.close()));
+  // Queues and the shared Redis client are process-wide singletons; leaving them
+  // open keeps the event loop alive and leaks connections on every reload.
+  await Promise.allSettled([closeAllQueues(), closeRedis()]);
   await disconnectDatabase();
   process.exit(0);
 };

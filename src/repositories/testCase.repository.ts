@@ -51,6 +51,7 @@ export const testCaseRepository = {
       orderBy: { createdAt: 'desc' },
       include: {
         _count: { select: { testSuiteItems: true, testRuns: true } },
+        testSuiteItems: { include: { testCase: true }, orderBy: { order: 'asc' } },
       },
     }),
 
