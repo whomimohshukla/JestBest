@@ -11,7 +11,7 @@ const REFRESH_PREFIX = 'auth:refresh:';
 const USER_TOKENS_PREFIX = 'auth:user-tokens:';
 const BLACKLIST_PREFIX = 'auth:blacklist:';
 const RESET_PREFIX = 'auth:reset:';
-const PASSWORD_EPOCH_PREFIX = 'auth:password-epoch:';
+const PASSWORD_VERSION_PREFIX = 'auth:password-version:';
 
 const toNumber = (value: unknown): number => {
   const n = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
@@ -23,8 +23,14 @@ const remainingTtl = (exp?: number): number => {
   return Math.max(60, exp - Math.floor(Date.now() / 1000));
 };
 
-/** Keep the password epoch at least as long as the longest access-token TTL. */
-const PASSWORD_EPOCH_TTL_SECONDS = 30 * 24 * 60 * 60;
+/** Keep the password version at least as long as the longest access-token TTL. */
+const PASSWORD_VERSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+/** Current password version for a user; 0 when the key is absent. */
+const passwordVersionOf = async (userId: string): Promise<number> => {
+  const raw = await getRedis().get(`${PASSWORD_VERSION_PREFIX}${userId}`);
+  return toNumber(raw);
+};
 
 const expiryToSeconds = (value: string): number => {
   const match = /^(\d+)\s*([smhd])$/.exec(value.trim());
@@ -68,6 +74,7 @@ export const tokenService = {
       roles: options.roles,
       type: 'access',
       jti,
+      pv: await passwordVersionOf(options.userId),
     };
     const accessToken = signToken(basePayload, 'access');
 
@@ -206,27 +213,20 @@ export const tokenService = {
   },
 
   /**
-   * Record that the password changed at this moment.
-   *
-   * Access tokens issued before this timestamp stop authenticating, which is
-   * what actually revokes a stolen session — refresh tokens are covered
-   * separately by revokeAllForUser, but access tokens are stateless.
+   * Bump the password version so every access token minted before now stops
+   * authenticating, which is what actually revokes a stolen session — refresh
+   * tokens are covered separately by revokeAllForUser, but access tokens are
+   * stateless. This is a monotonic counter rather than a timestamp because JWT
+   * `iat` is only precise to the second: storing "the time of the change" leaves
+   * a token minted in that same second indistinguishable from one minted after.
    */
   markPasswordChanged: async (userId: string): Promise<void> => {
-    await getRedis().set(
-      `${PASSWORD_EPOCH_PREFIX}${userId}`,
-      String(Math.floor(Date.now() / 1000)),
-      'EX',
-      PASSWORD_EPOCH_TTL_SECONDS
-    );
+    const key = `${PASSWORD_VERSION_PREFIX}${userId}`;
+    await getRedis().multi().incr(key).expire(key, PASSWORD_VERSION_TTL_SECONDS).exec();
   },
 
-  /** Epoch seconds of the last password change, or 0 if unknown/expired. */
-  passwordEpoch: async (userId: string): Promise<number> => {
-    const raw = await getRedis().get(`${PASSWORD_EPOCH_PREFIX}${userId}`);
-    const value = Number.parseInt(raw ?? '0', 10);
-    return Number.isFinite(value) ? value : 0;
-  },
+  /** Password version a token must carry to still be valid. */
+  passwordVersion: async (userId: string): Promise<number> => passwordVersionOf(userId),
 
   generateApiKey: (): string => {
     const entropy = randomBytes(24);

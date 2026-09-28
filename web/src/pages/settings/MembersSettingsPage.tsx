@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
-import { PageLoader, Select } from '../../components/ui';
+import { PageLoader, Select, FieldError } from '../../components/ui';
 import { Loader2, Mail, RefreshCw, Trash2, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Membership, MembershipRole } from '../../types';
@@ -20,6 +20,7 @@ export default function MembersSettingsPage() {
     email: '',
     role: 'DEVELOPER',
   });
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   const { data: members, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['org-members', orgId],
@@ -65,11 +66,17 @@ export default function MembersSettingsPage() {
 
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!invite.email.trim()) {
-      toast.error('Please enter an email address');
+    const email = invite.email.trim();
+    if (!email) {
+      setInviteError('Enter the email address to invite.');
       return;
     }
-    inviteMutation.mutate(invite);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setInviteError('Enter a valid email address.');
+      return;
+    }
+    setInviteError(null);
+    inviteMutation.mutate({ ...invite, email });
   };
 
   const handleRoleChange = (member: Membership, role: MembershipRole) => {
@@ -103,15 +110,24 @@ export default function MembersSettingsPage() {
         </div>
 
         <form onSubmit={handleInvite} className="flex flex-col md:flex-row gap-4">
-          <input
-            type="email"
-            value={invite.email}
-            onChange={(e) => setInvite({ ...invite, email: e.target.value })}
-            placeholder="teammate@company.com"
-            className="flex-1 px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
-            disabled={inviteMutation.isPending}
-            required
-          />
+          <div className="flex-1">
+            <input
+              id="invite-email"
+              type="email"
+              value={invite.email}
+              onChange={(e) => {
+                setInvite({ ...invite, email: e.target.value });
+                if (inviteError) setInviteError(null);
+              }}
+              placeholder="teammate@company.com"
+              className={`w-full px-4 py-3 bg-secondary/50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${inviteError ? 'border-red-500/70 ring-1 ring-red-500/40' : 'border-border'}`}
+              disabled={inviteMutation.isPending}
+              aria-invalid={!!inviteError}
+              aria-describedby={inviteError ? 'invite-email-error' : undefined}
+              required
+            />
+            <FieldError id="invite-email-error">{inviteError}</FieldError>
+          </div>
           <Select
             value={invite.role}
             onChange={(e) => setInvite({ ...invite, role: e.target.value as MembershipRole })}

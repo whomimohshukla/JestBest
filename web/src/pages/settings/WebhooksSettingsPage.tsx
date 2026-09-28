@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhooksApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
-import { PageLoader, Badge } from '../../components/ui';
+import { PageLoader, Badge, FieldError } from '../../components/ui';
 import { ChevronDown, Loader2, Plus, RefreshCw, Trash2, Webhook as WebhookIcon, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Webhook, WebhookDelivery } from '../../types';
@@ -70,6 +70,7 @@ export default function WebhooksSettingsPage() {
   const [showModal, setShowModal] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState({ url: '', secret: '', events: [] as string[] });
+  const [formErrors, setFormErrors] = useState<{ url?: string; events?: string }>({});
 
   const { data: webhooks, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['webhooks'],
@@ -123,6 +124,7 @@ export default function WebhooksSettingsPage() {
   });
 
   const toggleEvent = (event: string) => {
+    setFormErrors((p) => (p.events ? { ...p, events: undefined } : p));
     setForm((f) => ({
       ...f,
       events: f.events.includes(event)
@@ -133,14 +135,12 @@ export default function WebhooksSettingsPage() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.url.trim()) {
-      toast.error('Webhook URL is required');
-      return;
-    }
-    if (form.events.length === 0) {
-      toast.error('Select at least one event');
-      return;
-    }
+    const next: { url?: string; events?: string } = {};
+    if (!form.url.trim()) next.url = 'Enter the URL that should receive events.';
+    else if (!/^https?:\/\/.+/i.test(form.url.trim())) next.url = 'URL must start with http:// or https://';
+    if (form.events.length === 0) next.events = 'Select at least one event to forward.';
+    setFormErrors(next);
+    if (Object.keys(next).length > 0) return;
     createWebhookMutation.mutate(form);
   };
 
@@ -293,16 +293,25 @@ export default function WebhooksSettingsPage() {
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Webhook URL</label>
+                <label htmlFor="webhook-url" className="block text-sm font-medium mb-2">
+                  Webhook URL
+                </label>
                 <input
+                  id="webhook-url"
                   type="url"
                   value={form.url}
-                  onChange={(e) => setForm({ ...form, url: e.target.value })}
-                  className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  onChange={(e) => {
+                    setForm({ ...form, url: e.target.value });
+                    if (formErrors.url) setFormErrors((p) => ({ ...p, url: undefined }));
+                  }}
+                  className={`w-full px-4 py-3 bg-secondary/50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${formErrors.url ? 'border-red-500/70 ring-1 ring-red-500/40' : 'border-border'}`}
                   placeholder="https://example.com/hooks/jestbest"
                   disabled={createWebhookMutation.isPending}
+                  aria-invalid={!!formErrors.url}
+                  aria-describedby={formErrors.url ? 'webhook-url-error' : undefined}
                   required
                 />
+                <FieldError id="webhook-url-error">{formErrors.url}</FieldError>
               </div>
 
               <div>
@@ -319,7 +328,10 @@ export default function WebhooksSettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium mb-2">Events</label>
-                <div className="space-y-2">
+                <div
+                  className={`space-y-2 rounded-lg transition-colors ${formErrors.events ? 'ring-1 ring-red-500/40' : ''}`}
+                  aria-describedby={formErrors.events ? 'webhook-events-error' : undefined}
+                >
                   {EVENT_OPTIONS.map((event) => (
                     <label
                       key={event}
@@ -335,6 +347,7 @@ export default function WebhooksSettingsPage() {
                     </label>
                   ))}
                 </div>
+                <FieldError id="webhook-events-error">{formErrors.events}</FieldError>
               </div>
 
               <div className="flex gap-3 pt-4">

@@ -21,7 +21,8 @@ import {
   Select,
   EmptyState,
   PageLoader,
-} from '../../components/ui';
+  HowToBox,
+  FieldError } from '../../components/ui';
 import type { TestRun, TestCase } from '../../types';
 
 const STATUS_FILTERS = ['ALL', 'PENDING', 'QUEUED', 'RUNNING', 'PASSED', 'FAILED', 'CANCELLED'] as const;
@@ -36,6 +37,7 @@ export default function TestRunsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formProjectId, setFormProjectId] = useState('');
   const [selectedTestCaseIds, setSelectedTestCaseIds] = useState<string[]>([]);
+  const [testCaseError, setTestCaseError] = useState<string | null>(null);
 
   const { data: runList, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['test-runs', statusFilter, selectedProjectId],
@@ -63,7 +65,7 @@ export default function TestRunsPage() {
       testRunsApi.create(data),
     onSuccess: (run) => {
       queryClient.invalidateQueries({ queryKey: ['test-runs'] });
-      toast.success('Test run created successfully! 🚀');
+      toast.success('Test run created successfully!');
       setShowCreateModal(false);
       setFormProjectId('');
       setSelectedTestCaseIds([]);
@@ -91,6 +93,7 @@ export default function TestRunsPage() {
   };
 
   const toggleTestCase = (id: string) => {
+    if (testCaseError) setTestCaseError(null);
     setSelectedTestCaseIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
@@ -99,9 +102,10 @@ export default function TestRunsPage() {
   const handleCreateRun = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedTestCaseIds.length === 0) {
-      toast.error('Select at least one test case');
+      setTestCaseError('Select at least one test case to run.');
       return;
     }
+    setTestCaseError(null);
     createRunMutation.mutate({
       projectId: formProjectId,
       testCaseIds: selectedTestCaseIds,
@@ -168,7 +172,29 @@ export default function TestRunsPage() {
           ))}
         </div>
 
-        {/* Loading State */}
+        
+        <HowToBox
+          title="How test runs work"
+          steps={[
+            {
+              title: 'Pick a suite',
+              text: 'Choose the test suite you want to execute.',
+            },
+            {
+              title: 'Start the run',
+              text: 'Chromium opens and works through every case.',
+            },
+            {
+              title: 'Watch progress',
+              text: 'Runs are live: pending, running, then passed or failed.',
+            },
+            {
+              title: 'Analyse a failure',
+              text: 'Open the run and send a failure to the Failure Analyzer.',
+            },
+          ]}
+        />
+{/* Loading State */}
         {isLoading && <PageLoader label="Loading test runs..." />}
 
         {/* Error State */}
@@ -325,7 +351,10 @@ export default function TestRunsPage() {
                       No test cases found for this project.
                     </p>
                   ) : (
-                    <div className="max-h-64 overflow-y-auto border border-border rounded-lg bg-secondary/30 p-2 space-y-1">
+                    <div
+                      className={`max-h-64 overflow-y-auto border rounded-lg bg-secondary/30 p-2 space-y-1 ${testCaseError ? 'border-red-500/70 ring-1 ring-red-500/40' : 'border-border'}`}
+                      aria-describedby={testCaseError ? 'run-testcases-error' : undefined}
+                    >
                       {(projectTestCases?.items ?? []).map((testCase: TestCase) => (
                         <label
                           key={testCase.id}
@@ -342,6 +371,7 @@ export default function TestRunsPage() {
                       ))}
                     </div>
                   )}
+                  <FieldError id="run-testcases-error">{testCaseError}</FieldError>
                 </div>
               )}
 

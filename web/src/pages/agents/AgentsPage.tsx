@@ -19,7 +19,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { PageLoader, EmptyState, Select } from '../../components/ui';
+import { PageLoader, EmptyState, Select, HowToBox } from '../../components/ui';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/ui';
 import type { AgentRun } from '../../types';
 import type { LucideIcon } from 'lucide-react';
@@ -198,7 +198,29 @@ export default function AgentsPage() {
           })}
         </div>
 
-        {/* Loading State */}
+        
+        <HowToBox
+          title="How AI agents work"
+          steps={[
+            {
+              title: 'Choose an agent',
+              text: 'Each agent has one job: explore, generate, analyse, heal, or fix.',
+            },
+            {
+              title: 'Scope it',
+              text: 'Pick the project and optionally the application it should act on.',
+            },
+            {
+              title: 'Start and wait',
+              text: 'Agents run in the background queue and record every step.',
+            },
+            {
+              title: 'Review the output',
+              text: 'Check the run log and generated output on this page.',
+            },
+          ]}
+        />
+{/* Loading State */}
         {isLoading && <PageLoader label="Loading agent runs..." />}
 
         {/* Error State */}

@@ -95,9 +95,11 @@ createdb jestbest
 createdb jestbest_test
 ```
 
-Then set `DATABASE_URL` for the app and `TEST_DATABASE_URL` for Jest. Without
-`TEST_DATABASE_URL`, the integration suites fall back to appending
-`_test` to the database name.
+Then set `DATABASE_URL` for the app. The integration suites read
+`TEST_DATABASE_URL` and, if it is unset, fall back to
+`postgresql://jestbest:jestbest@localhost:5432/jestbest_test`. They deliberately
+ignore `DATABASE_URL` so that a developer with the dev database exported can
+never have the suite truncate it.
 
 ## Environment variables
 
@@ -118,10 +120,17 @@ start** if a required variable is missing, so a typo fails loudly instead of at
 
 ### Usually required in production
 
-`CORS_ORIGINS` (comma-separated allowlist), `SENDGRID_API_KEY` + `EMAIL_FROM`
-(outbound email), `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (billing),
+`CORS_ORIGINS` (comma-separated allowlist), `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (billing),
 `AWS_*` (S3 uploads for screenshots/videos), `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`
 (OAuth), and the `OPENAI_*` / `GEMINI_API_KEY` / `HUGGINGFACE_API_KEY` triplet.
+
+Outbound email is either `EMAIL_PROVIDER=sendgrid` (needs `SENDGRID_API_KEY`) or
+`EMAIL_PROVIDER=smtp`, which is handled by nodemailer and needs
+`SMTP_HOST`, `SMTP_USER` and `SMTP_PASSWORD` (`SMTP_PORT` defaults to 587,
+`SMTP_SECURE` to false, and `SMTP_FROM` defaults to `SMTP_USER` because Gmail
+rejects a `From` address that is not the authenticated account). Gmail requires
+an [App Password](https://support.google.com/accounts/answer/185833) with
+2-Step Verification enabled — the account's normal password will not work.
 
 ### Development conveniences
 
@@ -166,12 +175,22 @@ The product is **JestBest**, with **JB** used as the monogram in compact spots.
 | --- | --- |
 | Wordmark lockup (mark + "JestBest") | `web/public/logo.svg` |
 | Mark / app icon | `web/public/mark.svg` |
-| Favicon (simplified for 16px) | `web/public/favicon.svg` |
+| Favicon | `web/public/favicon.svg` |
 
-The React `<Logo />` component in `web/src/components/Logo.tsx` inlines the mark
-so the wordmark inherits the surrounding text colour, and supports
-`variant="full" | "short" | "mark"`. The palette is red to match the UI
-(`#EF4444` → `#DC2626` → `#991B1B` gradient, brand `red-600`/`red-500`).
+The mark is a rounded badge split vertically into two tones — light blush
+`#FCEAE8` on the left and deep red `#8A2E3A` on the right — with the divide
+running through the seam between the two letters. The "J" is drawn in the deep
+tone on the light half and the "B" in white on the deep half, so both letters
+stay legible (7.1:1 and 8.3:1) rather than blending into their own background.
+The letterforms are hand-authored paths rather than `<text>`, so the mark needs
+no webfont and renders identically in the browser, in `logo.svg`, and in the
+favicon.
+
+The React `<Logo />` component in `web/src/components/Logo.tsx` inlines the
+same geometry so the wordmark inherits the surrounding text colour, and
+supports `variant="full" | "mark"` plus an optional `showCaption` line. The UI
+accent ramp is defined in `web/src/index.css` as `--color-red-500 #F08080`
+(interactive accent), `--color-red-600 #D04552` and `--color-red-700 #A63A45`.
 
 
 ## Architecture
@@ -364,7 +383,7 @@ must run serially** — which is why `npm test` passes `--runInBand`. Running
 `__tests__/fixtures/testApp.ts` provides `request()`, `createTestUser()`, and
 `resetDatabase()`, and closes queues/Redis on teardown so Jest can exit.
 
-Current state: **184 tests across 12 suites passing** (last full run), plus four
+Current state: **208 tests across 16 suites passing** (last full run), plus four
 suites added for the tenancy and broken-flow fixes listed below.
 
 | Suite | What it covers |

@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '../../api';
 import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
-import { PageLoader, Select } from '../../components/ui';
+import { PageLoader, Select, FieldError } from '../../components/ui';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -45,9 +45,16 @@ export default function ProfileSettingsPage() {
     newPassword: '',
     confirmNewPassword: '',
   });
+  const [passwordErrors, setPasswordErrors] = useState<{
+    currentPassword?: string;
+    newPassword?: string;
+    confirmNewPassword?: string;
+  }>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [twoFactorPassword, setTwoFactorPassword] = useState('');
+  const [twoFactorError, setTwoFactorError] = useState<string | null>(null);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const [twoFactorSetup, setTwoFactorSetup] = useState<{ secret: string; otpauthUrl: string; qrDataUrl: string } | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
   const [disableCode, setDisableCode] = useState('');
@@ -68,7 +75,7 @@ export default function ProfileSettingsPage() {
     mutationFn: (data: { name: string; avatar: string }) => usersApi.updateMe(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['me'] });
-      toast.success('Profile updated successfully! 🎉');
+      toast.success('Profile updated successfully!');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -178,14 +185,14 @@ export default function ProfileSettingsPage() {
 
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordForm.newPassword.length < 8) {
-      toast.error('New password must be at least 8 characters');
-      return;
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
+    const next: { currentPassword?: string; newPassword?: string; confirmNewPassword?: string } = {};
+    if (!passwordForm.currentPassword) next.currentPassword = 'Enter your current password.';
+    if (passwordForm.newPassword.length < 8)
+      next.newPassword = 'New password must be at least 8 characters.';
+    else if (passwordForm.newPassword !== passwordForm.confirmNewPassword)
+      next.confirmNewPassword = 'Passwords do not match.';
+    setPasswordErrors(next);
+    if (Object.keys(next).length > 0) return;
     changePasswordMutation.mutate({
       currentPassword: passwordForm.currentPassword,
       newPassword: passwordForm.newPassword,
@@ -194,26 +201,29 @@ export default function ProfileSettingsPage() {
 
   const handleAvatarFile = (file: File) => {
     if (file.size > AVATAR_MAX_BYTES) {
-      toast.error('Image must be under 2MB.');
+      setAvatarError('Choose an image under 2MB.');
       return;
     }
     if (!file.type.startsWith('image/')) {
-      toast.error('Please choose an image file.');
+      setAvatarError('That file is not an image.');
       return;
     }
+    setAvatarError(null);
     const reader = new FileReader();
     reader.onload = () => {
       setForm((prev) => ({ ...prev, avatar: typeof reader.result === 'string' ? reader.result : '' }));
     };
+    // A read failure is a real I/O error, not a validation one, so it stays a dialog.
     reader.onerror = () => toast.error('Could not read the image file.');
     reader.readAsDataURL(file);
   };
 
   const handleSetup2fa = () => {
     if (!twoFactorPassword) {
-      toast.error('Enter your current password.');
+      setTwoFactorError('Enter your current password to continue.');
       return;
     }
+    setTwoFactorError(null);
     setupTwoFactorMutation.mutate(twoFactorPassword);
   };
 
@@ -348,6 +358,7 @@ export default function ProfileSettingsPage() {
               <p className="text-xs text-muted-foreground mt-1.5">
                 JPG, PNG or GIF, under 2MB
               </p>
+              <FieldError id="avatar-error">{avatarError}</FieldError>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -456,14 +467,23 @@ export default function ProfileSettingsPage() {
               2FA is currently <span className="font-medium">enabled</span> on your account.
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Current password</label>
+              <label htmlFor="2fa-disable-pw" className="block text-sm font-medium mb-2">
+                Current password
+              </label>
               <input
+                id="2fa-disable-pw"
                 type="password"
                 value={twoFactorPassword}
-                onChange={(e) => setTwoFactorPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                onChange={(e) => {
+                  setTwoFactorPassword(e.target.value);
+                  if (twoFactorError) setTwoFactorError(null);
+                }}
+                className={`w-full px-4 py-3 bg-secondary/50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${twoFactorError ? 'border-red-500/70 ring-1 ring-red-500/40' : 'border-border'}`}
                 placeholder="••••••••"
+                aria-invalid={!!twoFactorError}
+                aria-describedby={twoFactorError ? '2fa-disable-pw-error' : undefined}
               />
+              <FieldError id="2fa-disable-pw-error">{twoFactorError}</FieldError>
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">
@@ -482,9 +502,10 @@ export default function ProfileSettingsPage() {
             <button
               onClick={() => {
                 if (!twoFactorPassword) {
-                  toast.error('Enter your current password.');
+                  setTwoFactorError('Enter your current password to confirm.');
                   return;
                 }
+                setTwoFactorError(null);
                 disableTwoFactorMutation.mutate({ password: twoFactorPassword, code: disableCode || undefined });
               }}
               disabled={disableTwoFactorMutation.isPending}
@@ -657,43 +678,75 @@ export default function ProfileSettingsPage() {
 
         <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
           <div>
-            <label className="block text-sm font-medium mb-2">Current Password</label>
+            <label htmlFor="pw-current" className="block text-sm font-medium mb-2">
+              Current Password
+            </label>
             <input
+              id="pw-current"
               type="password"
               value={passwordForm.currentPassword}
-              onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-              className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              onChange={(e) => {
+                setPasswordForm({ ...passwordForm, currentPassword: e.target.value });
+                if (passwordErrors.currentPassword)
+                  setPasswordErrors((p) => ({ ...p, currentPassword: undefined }));
+              }}
+              className={`w-full px-4 py-3 bg-secondary/50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${passwordErrors.currentPassword ? 'border-red-500/70 ring-1 ring-red-500/40' : 'border-border'}`}
               placeholder="••••••••"
               disabled={changePasswordMutation.isPending}
+              aria-invalid={!!passwordErrors.currentPassword}
+              aria-describedby={passwordErrors.currentPassword ? 'pw-current-error' : undefined}
               required
             />
+            <FieldError id="pw-current-error">{passwordErrors.currentPassword}</FieldError>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">New Password</label>
+            <label htmlFor="pw-new" className="block text-sm font-medium mb-2">
+              New Password
+            </label>
             <input
+              id="pw-new"
               type="password"
               value={passwordForm.newPassword}
-              onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-              className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              onChange={(e) => {
+                setPasswordForm({ ...passwordForm, newPassword: e.target.value });
+                if (passwordErrors.newPassword)
+                  setPasswordErrors((p) => ({ ...p, newPassword: undefined }));
+              }}
+              className={`w-full px-4 py-3 bg-secondary/50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${passwordErrors.newPassword ? 'border-red-500/70 ring-1 ring-red-500/40' : 'border-border'}`}
               placeholder="At least 8 characters"
               minLength={8}
               disabled={changePasswordMutation.isPending}
+              aria-invalid={!!passwordErrors.newPassword}
+              aria-describedby={passwordErrors.newPassword ? 'pw-new-error' : undefined}
               required
             />
+            <FieldError id="pw-new-error">{passwordErrors.newPassword}</FieldError>
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Confirm New Password</label>
+            <label htmlFor="pw-confirm" className="block text-sm font-medium mb-2">
+              Confirm New Password
+            </label>
             <input
+              id="pw-confirm"
               type="password"
               value={passwordForm.confirmNewPassword}
-              onChange={(e) => setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value })}
-              className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              onChange={(e) => {
+                setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value });
+                if (passwordErrors.confirmNewPassword)
+                  setPasswordErrors((p) => ({ ...p, confirmNewPassword: undefined }));
+              }}
+              className={`w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${passwordErrors.confirmNewPassword ? 'border-red-500/70 ring-1 ring-red-500/40' : ''}`}
               placeholder="Re-enter new password"
               disabled={changePasswordMutation.isPending}
+              aria-invalid={!!passwordErrors.confirmNewPassword}
+              aria-describedby={
+                passwordErrors.confirmNewPassword ? 'pw-confirm-error' : undefined
+              }
               required
             />
+            <FieldError id="pw-confirm-error">{passwordErrors.confirmNewPassword}</FieldError>
           </div>
 
           <div className="pt-2">

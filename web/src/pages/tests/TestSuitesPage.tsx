@@ -64,7 +64,7 @@ export default function TestSuitesPage() {
       testSuitesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['test-suites'] });
-      toast.success('Test suite created successfully! 🎉');
+      toast.success('Test suite created successfully!');
       setShowCreateModal(false);
       setNewSuite({ name: '', description: '', projectId: '' });
     },

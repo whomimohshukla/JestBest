@@ -36,7 +36,7 @@ export default function OrganizationSettingsPage() {
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['org', orgId] });
       updateOrganization(updated);
-      toast.success('Organization updated successfully! 🎉');
+      toast.success('Organization updated successfully!');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

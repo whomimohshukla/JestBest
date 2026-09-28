@@ -82,7 +82,7 @@ export default function LandingPage() {
             <motion.div initial={{opacity:0,y:10}} animate={{opacity:1,y:0}} transition={{delay:0.45,duration:0.6}}
               className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/auth/register"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-3.5 text-base font-semibold text-white hover:bg-red-500 hover:-translate-y-0.5 transition-all">
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-6 py-3.5 text-base font-semibold text-white hover:bg-red-700 hover:-translate-y-0.5 transition-all">
                 Start testing free <ArrowRight className="h-5 w-5" />
               </Link>
               <button onClick={() => scrollTo('how-it-works')}
@@ -204,7 +204,7 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link to="/auth/register" className={`mt-8 inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold ${plan.highlight ? 'bg-red-600 text-white hover:bg-red-500' : 'border border-white/15 text-white hover:bg-white/5'}`}>{plan.cta}</Link>
+                <Link to="/auth/register" className={`mt-8 inline-flex items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold ${plan.highlight ? 'bg-red-600 text-white hover:bg-red-700' : 'border border-white/15 text-white hover:bg-white/5'}`}>{plan.cta}</Link>
               </div>
             ))}
           </div>
@@ -219,7 +219,7 @@ export default function LandingPage() {
             <div className="relative">
               <h2 className="text-3xl sm:text-5xl font-extrabold tracking-tight">Ship with confidence, every time</h2>
               <p className="mx-auto mt-4 max-w-xl text-lg text-zinc-400">Let AI agents explore, generate, and explain your QA — starting today.</p>
-              <Link to="/auth/register" className="mt-8 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-8 py-3.5 text-base font-semibold text-white hover:bg-red-500 transition-all">
+              <Link to="/auth/register" className="mt-8 inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-8 py-3.5 text-base font-semibold text-white hover:bg-red-700 transition-all">
                 Start testing free <ArrowRight className="h-5 w-5" />
               </Link>
             </div>

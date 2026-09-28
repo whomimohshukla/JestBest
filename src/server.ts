@@ -6,6 +6,7 @@ import { env } from './config/environment';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { closeRedis } from './config/redis';
 import { closeAllQueues } from './queues';
+import { emailService } from './services/notification/emailService';
 import { setupWorkers } from './workers';
 import { logger } from './config/logger';
 
@@ -22,8 +23,9 @@ const shutdown = async (signal: string): Promise<void> => {
   }
   await Promise.allSettled(workers.map((worker) => worker.close()));
   // Queues and the shared Redis client are process-wide singletons; leaving them
-  // open keeps the event loop alive and leaks connections on every reload.
-  await Promise.allSettled([closeAllQueues(), closeRedis()]);
+  // open keeps the event loop alive and leaks connections on every reload. The
+  // pooled SMTP transport holds an open socket for the same reason.
+  await Promise.allSettled([closeAllQueues(), closeRedis(), emailService.closeTransporter()]);
   await disconnectDatabase();
   process.exit(0);
 };

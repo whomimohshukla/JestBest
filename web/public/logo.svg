@@ -1,14 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="64" viewBox="0 0 256 64" fill="none" role="img" aria-label="JestBest">
+<svg xmlns="http://www.w3.org/2000/svg" width="248" height="64" viewBox="0 0 248 64" fill="none" role="img" aria-label="JestBest">
   <title>JestBest</title>
   <defs>
-    <linearGradient id="jb-badge" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#EF4444"/>
-      <stop offset="0.5" stop-color="#DC2626"/>
-      <stop offset="1" stop-color="#991B1B"/>
-    </linearGradient>
+    <clipPath id="jb-split-lock">
+      <rect x="2" y="2" width="60" height="60" rx="18"/>
+    </clipPath>
   </defs>
-  <rect x="2" y="2" width="60" height="60" rx="18" fill="url(#jb-badge)"/>
-  <path d="M17.5 33.5 26.5 42.5 46.5 21.5" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M47.5 10.5l1.9 4.6 4.6 1.9-4.6 1.9-1.9 4.6-1.9-4.6-4.6-1.9 4.6-1.9z" fill="#FECACA"/>
-  <text x="74" y="43" font-family="Inter, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="30" font-weight="800" letter-spacing="-0.8" fill="currentColor">Jest<tspan fill="#EF4444">Best</tspan></text>
+  <g clip-path="url(#jb-split-lock)">
+    <rect x="2" y="2" width="60" height="60" fill="#FCEAE8"/>
+    <path d="M32 2h30v60H32z" fill="#8A2E3A"/>
+  </g>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="5.5">
+    <path d="M28 18v22a6 6 0 0 1-12 0" stroke="#8A2E3A"/>
+    <path d="M35.25 18v28" stroke="#FFFFFF"/>
+    <path d="M35.25 18h5.25a5.25 7 0 0 1 0 14h-5.25" stroke="#FFFFFF"/>
+    <path d="M35.25 32h6.75a6.75 7 0 0 1 0 14h-6.75" stroke="#FFFFFF"/>
+  </g>
+  <text x="72" y="43" font-family="Inter, system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="29" font-weight="800" letter-spacing="-0.8" fill="#FAFAFA" textLength="168" lengthAdjust="spacingAndGlyphs">Jest<tspan fill="#F08080">Best</tspan></text>
 </svg>

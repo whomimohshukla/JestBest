@@ -35,7 +35,7 @@ export default function ProjectsPage() {
     mutationFn: (data: { name: string; description: string }) => projectsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('Project created successfully! 🎉');
+      toast.success('Project created successfully!');
       setShowCreateModal(false);
       setNewProject({ name: '', description: '' });
     },

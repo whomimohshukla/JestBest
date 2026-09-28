@@ -91,7 +91,7 @@ export function ErrorState({
         <button
           onClick={onRetry}
           disabled={isRetrying}
-          className="mt-2 inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="mt-2 inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <RefreshCw className={cn('h-4 w-4', isRetrying && 'animate-spin')} />
           {isRetrying ? 'Retrying…' : 'Try again'}

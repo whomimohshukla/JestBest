@@ -29,7 +29,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
-} from '../../components/ui';
+  HowToBox } from '../../components/ui';
 import type { TestCase, TestCaseType } from '../../types';
 
 const TEST_TYPES: TestCaseType[] = ['FUNCTIONAL', 'HAPPY_PATH', 'NEGATIVE', 'EDGE_CASE', 'REGRESSION', 'SMOKE'];
@@ -82,6 +82,7 @@ export default function TestCasesPage() {
     steps: [] as StepDraft[],
   });
   const [generateForm, setGenerateForm] = useState({
+    projectId: '',
     applicationId: '',
     requirements: '',
     count: 5,
@@ -101,10 +102,24 @@ export default function TestCasesPage() {
     queryFn: () => projectsApi.list({ pageSize: 100 }),
   });
 
+  // Keyed to the page-level project filter, not newTestCase.projectId: the
+  // "Generate with AI" modal uses selectedProjectId, so keying off the manual
+  // create form left its application dropdown permanently empty.
+  // The manual "New test case" form keeps its own project selection, so this
+  // backs the Applications select inside that modal.
   const { data: applicationList } = useQuery({
     queryKey: ['applications', newTestCase.projectId],
     queryFn: () => applicationsApi.list(newTestCase.projectId),
     enabled: !!newTestCase.projectId,
+  });
+
+  // The "Generate with AI" modal carries its own project select and filters the
+  // application list by it. It was previously reading newTestCase.projectId,
+  // which is state from the other modal, so the dropdown never populated.
+  const { data: generateApplications = [] } = useQuery({
+    queryKey: ['applications', generateForm.projectId],
+    queryFn: () => applicationsApi.list(generateForm.projectId),
+    enabled: !!generateForm.projectId,
   });
 
   const createTestCaseMutation = useMutation({
@@ -119,7 +134,7 @@ export default function TestCasesPage() {
     }) => testCasesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['test-cases'] });
-      toast.success('Test case created successfully! 🎉');
+      toast.success('Test case created successfully!');
       setShowCreateModal(false);
       setNewTestCase({ title: '', description: '', type: 'FUNCTIONAL', priority: 'medium', projectId: '', applicationId: '', steps: [] });
     },
@@ -138,9 +153,11 @@ export default function TestCasesPage() {
     }) => testCasesApi.generate(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['test-cases'] });
-      toast.success('Test case generation queued. They will appear once the AI completes. 🎉');
+      toast.success(
+        `Queued ${generateForm.count} test case(s). They appear in the list once generation finishes.`
+      );
       setShowGenerateModal(false);
-      setGenerateForm({ applicationId: '', requirements: '', count: 5 });
+      setGenerateForm({ projectId: '', applicationId: '', requirements: '', count: 5 });
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -238,7 +255,29 @@ export default function TestCasesPage() {
           </Select>
         </div>
 
-        {/* Loading State */}
+        
+        <HowToBox
+          title="How test cases work"
+          steps={[
+            {
+              title: 'Generate from a scan',
+              text: 'Scan an application and JestBest writes test cases for the pages it finds.',
+            },
+            {
+              title: 'Or write one by hand',
+              text: 'Use Generate with AI for a requirement, or add a case manually.',
+            },
+            {
+              title: 'Group into a suite',
+              text: 'Add cases to a test suite so they run together.',
+            },
+            {
+              title: 'Run and review',
+              text: 'Run a suite, then inspect pass and fail on Test Runs.',
+            },
+          ]}
+        />
+{/* Loading State */}
         {isLoading && <PageLoader label="Loading test cases..." />}
 
         {/* Error State */}
@@ -376,17 +415,17 @@ export default function TestCasesPage() {
               </button>
             </div>
 
-            {!selectedProjectId && (
-              <p className="text-amber-500 text-sm mb-4">Select a project in the filter above to choose an application.</p>
-            )}
+            <p className="text-muted-foreground text-sm mb-4">
+              Pick the project and application the tests should target, then describe the feature.
+            </p>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (!selectedProjectId || !generateForm.applicationId) return;
+                if (!generateForm.projectId || !generateForm.applicationId) return;
                 generateTestCaseMutation.mutate({
                   applicationId: generateForm.applicationId,
-                  projectId: selectedProjectId,
+                  projectId: generateForm.projectId,
                   requirements: generateForm.requirements || undefined,
                   types: undefined,
                   count: generateForm.count,
@@ -395,21 +434,58 @@ export default function TestCasesPage() {
               className="space-y-4"
             >
               <div>
+                <label className="block text-sm font-medium mb-2">Project *</label>
+                <Select
+                  value={generateForm.projectId}
+                  onChange={(e) =>
+                    setGenerateForm({
+                      ...generateForm,
+                      projectId: e.target.value,
+                      applicationId: '',
+                    })
+                  }
+                  className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                  required
+                  disabled={generateTestCaseMutation.isPending}
+                >
+                  <option value="">Select a project</option>
+                  {(projectList?.items ?? []).map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </Select>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Applications are listed per project. Pick the project that owns the app you want
+                  tests for.
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium mb-2">Application *</label>
                 <Select
                   value={generateForm.applicationId}
                   onChange={(e) => setGenerateForm({ ...generateForm, applicationId: e.target.value })}
                   className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                   required
-                  disabled={!selectedProjectId || generateTestCaseMutation.isPending}
+                  disabled={!generateForm.projectId || generateTestCaseMutation.isPending}
                 >
-                  <option value="">Select an application</option>
-                  {(applicationList ?? []).map((app) => (
+                  <option value="">
+                    {generateForm.projectId
+                      ? 'Select an application'
+                      : 'Choose a project first'}
+                  </option>
+                  {generateApplications.map((app) => (
                     <option key={app.id} value={app.id}>
                       {app.name}
                     </option>
                   ))}
                 </Select>
+                {generateForm.projectId && generateApplications.length === 0 && (
+                  <p className="mt-1.5 text-xs text-amber-500">
+                    This project has no applications yet. Add one on the Apps page, then scan it.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -448,7 +524,7 @@ export default function TestCasesPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedProjectId || !generateForm.applicationId || generateTestCaseMutation.isPending}
+                  disabled={!generateForm.projectId || !generateForm.applicationId || generateTestCaseMutation.isPending}
                   className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {generateTestCaseMutation.isPending ? (

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { authService } from '../../services/auth/authService';
 import { auditService } from '../../services/audit/auditTrailService';
-import { notificationService } from '../../services/notification/notificationService';
+
 import { created } from '../../utils/formatters';
 import { Messages } from '../../constants/messages';
 
@@ -13,11 +13,10 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     organizationName?: string;
   };
   const result = await authService.register({ email, password, name, organizationName });
-  
-  // Send welcome email (async, don't wait)
-  notificationService.notifyUserRegistered(result.user).catch(() => {
-    // Log error but don't fail the registration
-  });
+
+  // authService.register already sent the verification email (it owns the
+  // token). Do not send a second, link-less welcome email here -- that was
+  // both redundant and the reason the only "welcome" mail had no verify link.
   
   await auditService.log(
     {

@@ -21,7 +21,11 @@ export const listTestRuns = async (req: Request, res: Response): Promise<void> =
     ...(projectId
       ? { projectId: projectId as string }
       : { project: { organizationId: req.orgId } }),
-    ...(status ? { status: status as Prisma.TestRunWhereInput['status'] } : {}),
+    // QUEUED is a UI-facing alias for the PENDING run state; there is no QUEUED
+    // member in the TestStatus enum, so mapping it here keeps the filter valid.
+    ...(status
+      ? { status: (status === 'QUEUED' ? 'PENDING' : status) as Prisma.TestRunWhereInput['status'] }
+      : {}),
   };
   const runs = await testRunService.list(where, Number(page), Number(pageSize));
   res.status(200).json(ok(runs));

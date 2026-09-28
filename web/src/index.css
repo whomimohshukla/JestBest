@@ -80,7 +80,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 0 3% 15%;
     --input: 0 3% 16%;
-    --ring: 176 95% 48%;
+    --ring: 0 79% 72%;
     --radius: 0.5rem;
   }
 }
@@ -92,6 +92,30 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /*
+   * Native <select> popups are rendered by the OS, not the page, so they ignore
+   * the utility classes on the element itself. Without these, the option list
+   * renders with the browser default white background and dark text, which is
+   * unreadable on this dark UI and inconsistent with the closed control.
+   */
+  select {
+    color-scheme: dark;
+  }
+  select option,
+  select optgroup {
+    background-color: hsl(var(--secondary));
+    color: hsl(var(--secondary-foreground));
+  }
+  /* --primary is near-white in this theme, so it would give white-on-white text
+     here. Use the brand red instead so the selected row stays readable. */
+  select option:checked {
+    background-color: hsl(0 72% 30%);
+    color: hsl(0 0% 100%);
+  }
+  select:disabled {
+    opacity: 0.5;
   }
 }
 

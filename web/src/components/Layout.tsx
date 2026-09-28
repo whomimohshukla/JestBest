@@ -243,9 +243,12 @@ export default function Layout({ children }: LayoutProps) {
           <div className="p-4 border-t border-border">
             <div className="glass p-4 rounded-lg">
               <p className="text-xs text-muted-foreground mb-2">Need help?</p>
-              <a href="#" className="text-sm text-red-500 hover:underline font-medium">
+              <Link
+                to="/docs"
+                className="text-sm text-red-500 hover:underline font-medium inline-flex items-center gap-1"
+              >
                 View Documentation →
-              </a>
+              </Link>
             </div>
           </div>
         </aside>

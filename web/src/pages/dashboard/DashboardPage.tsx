@@ -34,7 +34,8 @@ export default function DashboardPage() {
 
   const { data: projects } = useQuery<{ items: Project[] }>({
     queryKey: ['projects', 'dashboard'],
-    queryFn: () => projectsApi.list({ pageSize: 200 }) as Promise<{ items: Project[] }>,
+    // The API caps pageSize at 100; 200 was rejected with a 400.
+    queryFn: () => projectsApi.list({ pageSize: 100 }) as Promise<{ items: Project[] }>,
     enabled: !isLoading,
   });
 
@@ -122,7 +123,7 @@ export default function DashboardPage() {
           </div>
           <button
             onClick={handleRefresh}
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
           >
             <RefreshCcw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             Try again

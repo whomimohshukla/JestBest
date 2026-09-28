@@ -57,6 +57,19 @@ const envSchema = z.object({
   SENDGRID_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default('notifications@jestbest.ai'),
   EMAIL_INBOX_FILE: z.string().default('.dev-mailbox.log'),
+
+  // SMTP (nodemailer). Port 465 implies implicit TLS, 587 uses STARTTLS.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: z
+    .string()
+    .optional()
+    .transform((value) => value === 'true'),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASSWORD: z.string().optional(),
+  // Providers such as Gmail reject a From address that is not the
+  // authenticated account (or an alias of it), so this defaults to SMTP_USER.
+  SMTP_FROM: z.string().optional(),
   REQUIRE_EMAIL_VERIFICATION: z
     .string()
     .optional()

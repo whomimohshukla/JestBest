@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../api';
-import { getErrorMessage, getErrorCode } from '../../api/client';
+import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Bot, Lock, Mail, ArrowRight, Zap, Bug, GitBranch, Database, CheckCircle2, AlertCircle } from 'lucide-react';
@@ -69,15 +69,11 @@ export default function LoginPage() {
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (error) {
-      const code = getErrorCode(error);
+      // The form already renders this inline via setError; a dialog here would
+      // repeat the same sentence and block the retry.
       const message = getErrorMessage(error);
       setError(message);
       setPassword('');
-      if (code === 'RATE_LIMITED') {
-        toast.error('Too many attempts. Please wait a few minutes before trying again.');
-      } else {
-        toast.error(message);
-      }
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +193,10 @@ export default function LoginPage() {
 
           <form onSubmit={twoFactorToken ? handleTwoFactorSubmit : handleSubmit} className="space-y-5">
             {error && (
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400">
+              <div
+                role="alert"
+                className="flex items-start gap-3 p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400"
+              >
                 <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
                 <div className="text-sm space-y-1">
                   <p className="font-medium">{error}</p>
@@ -297,7 +296,7 @@ export default function LoginPage() {
             )}
 
             <button type="submit" disabled={isLoading}
-              className="w-full py-3 bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group">
+              className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 group">
               {isLoading ? (<>
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Verifying...

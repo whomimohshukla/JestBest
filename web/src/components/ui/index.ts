@@ -9,4 +9,7 @@ export { ErrorState, type ErrorStateKind } from './error-state';
 export { OfflineBanner } from './OfflineBanner';
 export { RunStatusBadge, BugStatusBadge, SeverityBadge, PriorityBadge, InfoRow } from './status';
 export { Select, type SelectProps } from './select';
+export { PopupViewport } from './PopupViewport';
+export { FieldError } from './field-error';
+export { HowToBox, FieldHint, type HowToStep } from './how-to';
 export * from './table';

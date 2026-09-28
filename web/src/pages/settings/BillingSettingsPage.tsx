@@ -62,7 +62,7 @@ export default function BillingSettingsPage() {
     mutationFn: (plan: string) => billingApi.updatePlan(plan),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['billing'] });
-      toast.success('Plan updated successfully! 🎉');
+      toast.success('Plan updated successfully!');
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));

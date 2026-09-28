@@ -13,8 +13,8 @@ import {
  * Password reset hardening:
  *  - reset tokens are purpose-bound (a normal access token is rejected)
  *  - reset tokens are single-use (Redis GETDEL)
- *  - changing the password bumps a password epoch so previously issued access
- *    tokens stop working
+ *  - changing the password bumps a password version so previously issued
+ *    access tokens stop working, while tokens minted afterwards keep working
  */
 
 const API = '/api/v1';
@@ -95,7 +95,7 @@ describe('password reset token hardening', () => {
       .send({ token, password: NEW_PASSWORD });
     expect(reset.status).toBe(200);
 
-    // The epoch bumped, so the pre-reset access token is now dead.
+    // The version bumped, so the pre-reset access token is now dead.
     const after = await api.get(`${API}/projects`).set(auth(user));
     expect(after.status).toBe(401);
     expect(after.body.error.message).toMatch(/no longer valid|session/i);
@@ -110,5 +110,27 @@ describe('password reset token hardening', () => {
 
     const after = await api.get(`${API}/projects`).set(auth(user));
     expect(after.status).toBe(401);
+  });
+
+  it('keeps access tokens minted after the password change working', async () => {
+    // The counterpart to the two tests above. Revoking by a timestamp is only
+    // safe if it cannot also reject a token minted moments later, which is the
+    // bug a second-granular `iat` comparison introduces.
+    const token = await tokenService.issuePasswordResetToken(user.userId);
+    const reset = await api
+      .post(`${API}/auth/reset-password`)
+      .send({ token, password: NEW_PASSWORD });
+    expect(reset.status).toBe(200);
+
+    const login = await api
+      .post(`${API}/auth/login`)
+      .send({ email: user.email, password: NEW_PASSWORD });
+    expect(login.status).toBe(200);
+
+    const fresh = login.body.data.tokens.accessToken as string;
+    expect(fresh).toBeTruthy();
+
+    const after = await api.get(`${API}/projects`).set({ Authorization: `Bearer ${fresh}` });
+    expect(after.status).toBe(200);
   });
 });

@@ -1,5 +1,7 @@
 import { env } from '../../config/environment';
 import { logger } from '../../config/logger';
+import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -14,11 +16,95 @@ export interface EmailOptions {
 const EMAIL_STYLES = {
   body: 'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f7;',
   container: 'max-width: 600px; margin: 0 auto; background: white;',
-  header: 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center;',
+  header: 'background: linear-gradient(135deg, #8A2E3A 0%, #6B2130 100%); color: white; padding: 40px 20px; text-align: center;',
   content: 'padding: 40px 30px;',
   footer: 'background: #f8f9fa; padding: 30px; text-align: center; color: #6c757d; font-size: 14px; border-top: 1px solid #dee2e6;',
-  button: 'display: inline-block; padding: 14px 28px; background: #667eea; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0;',
+  button: 'display: inline-block; padding: 14px 28px; background: #8A2E3A; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0;',
   badge: 'display: inline-block; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin: 5px;',
+};
+
+/** Escape user-supplied values before they are interpolated into HTML. */
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+/** Turn a config TTL like "15m" or "7d" into copy a human can act on. */
+const humaniseExpiry = (value: string): string => {
+  const match = /^(\d+)\s*([smhd])$/.exec(String(value).trim());
+  if (!match) return 'a short while';
+  const n = Number(match[1]);
+  const [unit, label] =
+    match[2] === 's'
+      ? ['second', 'seconds']
+      : match[2] === 'm'
+        ? ['minute', 'minutes']
+        : match[2] === 'h'
+          ? ['hour', 'hours']
+          : ['day', 'days'];
+  return `${n} ${n === 1 ? unit : label}`;
+};
+
+/** Very small HTML-to-text fallback so messages still read in plain-text clients. */
+const htmlToText = (html: string): string =>  html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|h[1-6]|li|tr)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+let smtpTransporter: Transporter | null = null;
+let smtpTransporterKey: string | null = null;
+
+/**
+ * Lazily build (and reuse) the SMTP transport. Nodemailer opens a socket per
+ * message, so a pooled transporter is cached and only rebuilt when the
+ * connection settings actually change.
+ */
+const getSmtpTransporter = (): Transporter => {
+  const host = env.SMTP_HOST;
+  if (!host) {
+    throw new Error('SMTP_HOST is not configured but EMAIL_PROVIDER=smtp');
+  }
+  const user = env.SMTP_USER;
+  const pass = env.SMTP_PASSWORD;
+  if (!user || !pass) {
+    throw new Error('SMTP_USER and SMTP_PASSWORD must be set when EMAIL_PROVIDER=smtp');
+  }
+
+  const port = env.SMTP_PORT ?? 587;
+  // Implicit TLS on 465, STARTTLS on 587/25. Allow SMTP_SECURE to override.
+  const secure = env.SMTP_SECURE ?? port === 465;
+  const key = `${host}|${port}|${secure}|${user}`;
+
+  if (!smtpTransporter || smtpTransporterKey !== key) {
+    smtpTransporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      pool: true,
+      maxConnections: 3,
+      maxMessages: 100,
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
+    });
+    smtpTransporterKey = key;
+  }
+  return smtpTransporter;
 };
 
 export const emailService = {
@@ -94,10 +180,40 @@ export const emailService = {
     throw new Error('AWS SES not yet implemented');
   },
   
-  async sendViaSMTP(_options: EmailOptions): Promise<void> {
-    // SMTP integration would go here
-    // For now, just log
-    logger.warn('SMTP email sending not implemented, email not sent');
+  async sendViaSMTP(options: EmailOptions): Promise<void> {
+    const transporter = getSmtpTransporter();
+    const to = Array.isArray(options.to) ? options.to : [options.to];
+    // Gmail (and most SMTP providers) reject a From address that is neither
+    // the authenticated account nor one of its aliases, so fall back to the
+    // SMTP user rather than the notifications@ domain default.
+    const from = env.SMTP_FROM || env.SMTP_USER || env.EMAIL_FROM;
+
+    const info = await transporter.sendMail({
+      from: { name: 'JestBest', address: from },
+      to,
+      subject: options.subject,
+      html: options.html,
+      text: options.text ?? htmlToText(options.html),
+    });
+
+    logger.info(
+      { to, subject: options.subject, messageId: info.messageId, from },
+      'Email delivered over SMTP'
+    );
+  },
+
+  /** Release pooled SMTP sockets. Safe to call when SMTP was never used. */
+  closeTransporter: async (): Promise<void> => {
+    if (!smtpTransporter) return;
+    smtpTransporter.close();
+    smtpTransporter = null;
+    smtpTransporterKey = null;
+  },
+
+  /** Verify credentials/connectivity without sending. Useful for diagnostics. */
+  verifySMTP: async (): Promise<boolean> => {
+    const transporter = getSmtpTransporter();
+    return transporter.verify();
   },
 
   async sendViaLog(options: EmailOptions): Promise<void> {
@@ -326,32 +442,32 @@ export const emailService = {
       </div>
       ` : ''}
       
-      <h3 style="color: #667eea; margin-top: 30px;">🚀 Quick Start Guide</h3>
+      <h3 style="color: #8A2E3A; margin-top: 30px;">🚀 Quick Start Guide</h3>
       
       <div style="margin: 20px 0;">
-        <div style="padding: 15px; border-left: 4px solid #667eea; background: #f8f9fa; margin-bottom: 15px;">
+        <div style="padding: 15px; border-left: 4px solid #8A2E3A; background: #f8f9fa; margin-bottom: 15px;">
           <strong>1. Create Your Organization</strong>
           <p style="margin: 5px 0 0 0; color: #666;">Set up your team workspace and invite members</p>
         </div>
         
-        <div style="padding: 15px; border-left: 4px solid #667eea; background: #f8f9fa; margin-bottom: 15px;">
+        <div style="padding: 15px; border-left: 4px solid #8A2E3A; background: #f8f9fa; margin-bottom: 15px;">
           <strong>2. Add Your First Project</strong>
           <p style="margin: 5px 0 0 0; color: #666;">Connect your application and configure test environments</p>
         </div>
         
-        <div style="padding: 15px; border-left: 4px solid #667eea; background: #f8f9fa; margin-bottom: 15px;">
+        <div style="padding: 15px; border-left: 4px solid #8A2E3A; background: #f8f9fa; margin-bottom: 15px;">
           <strong>3. Let AI Discover Your App</strong>
           <p style="margin: 5px 0 0 0; color: #666;">Our AI will automatically map your application flows</p>
         </div>
         
-        <div style="padding: 15px; border-left: 4px solid #667eea; background: #f8f9fa;">
+        <div style="padding: 15px; border-left: 4px solid #8A2E3A; background: #f8f9fa;">
           <strong>4. Generate & Run Tests</strong>
           <p style="margin: 5px 0 0 0; color: #666;">AI creates test cases and executes them automatically</p>
         </div>
       </div>
       
-      <div style="background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); padding: 25px; border-radius: 8px; margin: 30px 0;">
-        <h3 style="margin: 0 0 15px 0; color: #667eea;">✨ What You Get With JestBest</h3>
+      <div style="background: linear-gradient(135deg, #8A2E3A15 0%, #6B213015 100%); padding: 25px; border-radius: 8px; margin: 30px 0;">
+        <h3 style="margin: 0 0 15px 0; color: #8A2E3A;">✨ What You Get With JestBest</h3>
         <ul style="margin: 0; padding-left: 20px; color: #555;">
           <li style="margin-bottom: 10px;">🤖 AI-powered test generation</li>
           <li style="margin-bottom: 10px;">🔍 Automatic bug detection</li>
@@ -370,9 +486,9 @@ export const emailService = {
         <h3 style="color: #333;">Need Help?</h3>
         <p>Check out our resources:</p>
         <p>
-          📖 <a href="${env.APP_ORIGIN}/docs" style="color: #667eea;">Documentation</a> | 
-          💬 <a href="${env.APP_ORIGIN}/support" style="color: #667eea;">Support</a> | 
-          🎥 <a href="${env.APP_ORIGIN}/tutorials" style="color: #667eea;">Video Tutorials</a>
+          📖 <a href="${env.APP_ORIGIN}/docs" style="color: #8A2E3A;">Documentation</a> | 
+          💬 <a href="${env.APP_ORIGIN}/support" style="color: #8A2E3A;">Support</a> | 
+          🎥 <a href="${env.APP_ORIGIN}/tutorials" style="color: #8A2E3A;">Video Tutorials</a>
         </p>
       </div>
     </div>
@@ -382,7 +498,7 @@ export const emailService = {
         <strong>JestBest</strong> - AI-Powered QA Automation
       </p>
       <p style="margin: 0; font-size: 13px;">
-        Questions? Reply to this email or visit our <a href="${env.APP_ORIGIN}/support" style="color: #667eea;">support center</a>
+        Questions? Reply to this email or visit our <a href="${env.APP_ORIGIN}/support" style="color: #8A2E3A;">support center</a>
       </p>
     </div>
   </div>
@@ -403,55 +519,77 @@ export const emailService = {
       verificationUrl: string;
     }
   ): Promise<void> {
-    const subject = '📧 Verify Your JestBest Email Address';
-    
+    // No emoji in the subject: Gmail treats emoji-prefixed subjects from a
+    // freshly created account as a strong spam signal.
+    const subject = 'Verify your JestBest email address';
+
+    // Verification tokens are signed with the access secret, so their lifetime
+    // is the access-token TTL. Read it from config rather than hardcoding a
+    // number, so the copy cannot drift from the real expiry again.
+    const lifetime = humaniseExpiry(env.JWT_ACCESS_EXPIRES_IN);
+
     const html = `
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="${EMAIL_STYLES.body}">
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Confirm your address to finish setting up JestBest.</div>
   <div style="${EMAIL_STYLES.container}">
     <div style="${EMAIL_STYLES.header}">
-      <h1 style="margin: 0; font-size: 28px;">📧 Verify Your Email</h1>
+      <p style="margin:0 0 10px 0;font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85;">Email verification</p>
+      <h1 style="margin:0;font-size:26px;line-height:1.25;">Confirm your address</h1>
     </div>
-    
+
     <div style="${EMAIL_STYLES.content}">
-      <p>Hi ${data.name},</p>
-      
-      <p style="font-size: 16px;">
-        Please verify your email address to activate your JestBest account and start using all features.
+      <p style="margin:0 0 16px 0;">Hi ${escapeHtml(data.name || 'there')},</p>
+
+      <p style="margin:0 0 24px 0;font-size:16px;line-height:1.65;">
+        Thanks for creating a JestBest account. Confirm this address to activate
+        your workspace and start generating real browser tests.
       </p>
-      
-      <center>
-        <a href="${data.verificationUrl}" style="${EMAIL_STYLES.button}">Verify Email Address</a>
-      </center>
-      
-      <p style="color: #6c757d; font-size: 14px; margin-top: 30px;">
-        Or copy and paste this link into your browser:<br>
-        <code style="background: #f8f9fa; padding: 8px; display: inline-block; margin-top: 10px; border-radius: 4px; word-break: break-all;">
-          ${data.verificationUrl}
-        </code>
+
+      <p style="margin:0 0 28px 0;">
+        <a href="${data.verificationUrl}" style="${EMAIL_STYLES.button}">Verify email address</a>
       </p>
-      
-      <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px;">
-        <p style="margin: 0; color: #856404;">
-          ⏰ <strong>Important:</strong> This verification link expires in 24 hours.
+
+      <p style="margin:0 0 8px 0;color:#6c757d;font-size:13px;line-height:1.6;">
+        This button does not work? Paste this link into your browser:
+      </p>
+      <p style="margin:0 0 24px 0;">
+        <a href="${data.verificationUrl}" style="color:#8A2E3A;font-size:13px;word-break:break-all;">${data.verificationUrl}</a>
+      </p>
+
+      <div style="background:#fdf2f2;border-left:4px solid #8A2E3A;padding:14px 16px;margin:0 0 24px 0;border-radius:4px;">
+        <p style="margin:0;color:#6b2130;font-size:13px;line-height:1.6;">
+          <strong>Heads up:</strong> this link expires in ${lifetime}. After that you can
+          request a new one from the sign-in page.
         </p>
       </div>
-      
-      <p style="color: #6c757d; font-size: 14px;">
-        If you didn't create a JestBest account, you can safely ignore this email.
+
+      <p style="margin:0;color:#6c757d;font-size:13px;line-height:1.6;">
+        If you did not create a JestBest account you can safely ignore this email.
       </p>
     </div>
-    
+
     <div style="${EMAIL_STYLES.footer}">
-      <p style="margin: 0;">JestBest - AI-Powered QA Automation</p>
+      <p style="margin:0 0 8px 0;"><strong>JestBest</strong> &middot; AI-powered QA automation</p>
+      <p style="margin:0;font-size:12px;color:#8a8f98;">Sent to ${escapeHtml(to)}</p>
     </div>
   </div>
 </body>
 </html>
     `;
-    
-    await this.sendEmail({ to, subject, html });
+
+    const text =
+      `Hi ${data.name || 'there'},\n\n` +
+      `Thanks for creating a JestBest account. Confirm your email address to activate\n` +
+      `your workspace and start generating real browser tests:\n\n` +
+      `${data.verificationUrl}\n\n` +
+      `This link expires in ${lifetime}. If you did not create a JestBest account,\n` +
+      `you can safely ignore this email.\n\n` +
+      `JestBest - AI-powered QA automation`;
+
+    await this.sendEmail({ to, subject, html, text });
   },
   
   /**
@@ -547,7 +685,7 @@ export const emailService = {
       
       <div style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin: 25px 0;">
         <p style="margin: 0 0 10px 0;"><strong>Organization:</strong> ${data.organizationName}</p>
-        <p style="margin: 0;"><strong>Your Role:</strong> <span style="${EMAIL_STYLES.badge} background: #667eea; color: white;">${data.role}</span></p>
+        <p style="margin: 0;"><strong>Your Role:</strong> <span style="${EMAIL_STYLES.badge} background: #8A2E3A; color: white;">${data.role}</span></p>
       </div>
       
       <p>Join the team to collaborate on automated testing and quality assurance!</p>
@@ -676,7 +814,7 @@ export const emailService = {
       <div style="margin: 30px 0;">
         <h3 style="color: #333;">🏆 Top Active Projects</h3>
         ${data.stats.topProjects.map((project, idx) => `
-          <div style="padding: 15px; background: ${idx === 0 ? '#fff7ed' : '#f8f9fa'}; border-left: 4px solid ${idx === 0 ? '#f97316' : '#667eea'}; margin-bottom: 10px; border-radius: 4px;">
+          <div style="padding: 15px; background: ${idx === 0 ? '#fff7ed' : '#f8f9fa'}; border-left: 4px solid ${idx === 0 ? '#f97316' : '#8A2E3A'}; margin-bottom: 10px; border-radius: 4px;">
             <strong>${project.name}</strong>
             <div style="margin-top: 5px; color: #666; font-size: 14px;">
               ${project.testsRun} tests run • ${project.passRate}% pass rate
@@ -690,7 +828,7 @@ export const emailService = {
         <a href="${env.APP_ORIGIN}/dashboard/analytics" style="${EMAIL_STYLES.button}">View Full Analytics</a>
       </center>
       
-      <div style="background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%); padding: 20px; border-radius: 8px; margin-top: 30px;">
+      <div style="background: linear-gradient(135deg, #8A2E3A15 0%, #6B213015 100%); padding: 20px; border-radius: 8px; margin-top: 30px;">
         <p style="margin: 0; font-size: 14px; color: #555;">
           💡 <strong>Tip:</strong> Keep your pass rate above 95% by fixing flaky tests and addressing bugs promptly.
         </p>
@@ -700,7 +838,7 @@ export const emailService = {
     <div style="${EMAIL_STYLES.footer}">
       <p style="margin: 0 0 10px 0;">JestBest - AI-Powered QA Automation</p>
       <p style="margin: 0; font-size: 12px;">
-        <a href="${env.APP_ORIGIN}/settings/notifications" style="color: #667eea;">Manage email preferences</a>
+        <a href="${env.APP_ORIGIN}/settings/notifications" style="color: #8A2E3A;">Manage email preferences</a>
       </p>
     </div>
   </div>
@@ -739,7 +877,7 @@ export const emailService = {
 <html>
 <body style="${EMAIL_STYLES.body}">
   <div style="${EMAIL_STYLES.container}">
-    <div style="background: ${severityColors[data.severity] || '#667eea'}; color: white; padding: 30px 20px; text-align: center;">
+    <div style="background: ${severityColors[data.severity] || '#8A2E3A'}; color: white; padding: 30px 20px; text-align: center;">
       <h1 style="margin: 0; font-size: 28px;">🐛 New Bug Reported</h1>
     </div>
 
@@ -805,7 +943,7 @@ export const emailService = {
 <html>
 <body style="${EMAIL_STYLES.body}">
   <div style="${EMAIL_STYLES.container}">
-    <div style="background: ${severityColors[data.severity] || '#667eea'}; color: white; padding: 30px 20px; text-align: center;">
+    <div style="background: ${severityColors[data.severity] || '#8A2E3A'}; color: white; padding: 30px 20px; text-align: center;">
       <h1 style="margin: 0; font-size: 28px;">🐛 Bug Assigned</h1>
     </div>
     
@@ -889,7 +1027,7 @@ export const emailService = {
           <tr>
             <td style="padding: 8px 0;"><strong>Environment:</strong></td>
             <td style="padding: 8px 0; text-align: right;">
-              <span style="${EMAIL_STYLES.badge} background: #667eea; color: white;">${data.environment}</span>
+              <span style="${EMAIL_STYLES.badge} background: #8A2E3A; color: white;">${data.environment}</span>
             </td>
           </tr>
           <tr>

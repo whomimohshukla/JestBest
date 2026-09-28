@@ -16,6 +16,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Keep types in step with the Vite alias: `react-hot-toast` resolves to our
+       centred-dialog shim at build time, so it must resolve to it for tsc too. */
+    "paths": {
+      "react-hot-toast": ["./src/lib/toast.ts"]
+    },
+
     /* Linting */
     "noUnusedLocals": true,
     "noUnusedParameters": true,

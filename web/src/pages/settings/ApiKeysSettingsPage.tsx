@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiKeysApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
-import { PageLoader } from '../../components/ui';
+import { PageLoader, FieldError } from '../../components/ui';
 import { Copy, KeyRound, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ApiKey } from '../../types';
@@ -12,6 +12,7 @@ export default function ApiKeysSettingsPage() {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [keyName, setKeyName] = useState('');
+  const [keyNameError, setKeyNameError] = useState<string | null>(null);
   const [createdKey, setCreatedKey] = useState<ApiKey & { plainKey: string } | null>(null);
 
   const { data: apiKeys, isLoading, isError, refetch, isFetching } = useQuery({
@@ -44,10 +45,11 @@ export default function ApiKeysSettingsPage() {
   const handleCreateKey = (e: React.FormEvent) => {
     e.preventDefault();
     if (!keyName.trim()) {
-      toast.error('Please enter a name for the key');
+      setKeyNameError('Enter a name for the key.');
       return;
     }
-    createKeyMutation.mutate(keyName);
+    setKeyNameError(null);
+    createKeyMutation.mutate(keyName.trim());
   };
 
   const handleCopy = async () => {
@@ -215,16 +217,25 @@ export default function ApiKeysSettingsPage() {
 
                 <form onSubmit={handleCreateKey} className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium mb-2">Key Name</label>
+                    <label htmlFor="key-name" className="block text-sm font-medium mb-2">
+                      Key Name
+                    </label>
                     <input
+                      id="key-name"
                       type="text"
                       value={keyName}
-                      onChange={(e) => setKeyName(e.target.value)}
-                      className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+                      onChange={(e) => {
+                        setKeyName(e.target.value);
+                        if (keyNameError) setKeyNameError(null);
+                      }}
+                      className={`w-full px-4 py-3 bg-secondary/50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${keyNameError ? 'border-red-500/70 ring-1 ring-red-500/40' : 'border-border'}`}
                       placeholder="e.g. CI pipeline"
                       disabled={createKeyMutation.isPending}
+                      aria-invalid={!!keyNameError}
+                      aria-describedby={keyNameError ? 'key-name-error' : undefined}
                       required
                     />
+                    <FieldError id="key-name-error">{keyNameError}</FieldError>
                   </div>
 
                   <div className="flex gap-3 pt-4">

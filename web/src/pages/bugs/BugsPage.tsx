@@ -18,7 +18,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
-} from '../../components/ui';
+  HowToBox } from '../../components/ui';
 import { Plus, Search, Bug, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Bug as BugType, BugSeverity, BugPriority } from '../../types';
@@ -74,7 +74,7 @@ export default function BugsPage() {
     }) => bugsApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bugs'] });
-      toast.success('Bug reported successfully! 🎉');
+      toast.success('Bug reported successfully!');
       setShowCreateModal(false);
       setNewBug({ title: '', description: '', severity: 'MEDIUM', priority: 'P2', projectId: selectedProjectId });
     },
@@ -155,7 +155,29 @@ export default function BugsPage() {
           </Select>
         </div>
 
-        {/* Loading State */}
+        
+        <HowToBox
+          title="How bugs work"
+          steps={[
+            {
+              title: 'Raise a bug',
+              text: 'Create one here, or let a failed run raise it for you.',
+            },
+            {
+              title: 'Set severity',
+              text: 'Severity is impact; priority is urgency.',
+            },
+            {
+              title: 'Assign and discuss',
+              text: 'Assign an owner and use comments to track progress.',
+            },
+            {
+              title: 'Resolve it',
+              text: 'Move through the statuses until the bug is closed.',
+            },
+          ]}
+        />
+{/* Loading State */}
         {isLoading && <PageLoader label="Loading bugs..." />}
 
         {/* Error State */}

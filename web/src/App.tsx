@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'react-hot-toast';
+import { PopupViewport } from './components/ui/PopupViewport';
 import { useAuthStore } from './store/authStore';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
@@ -26,6 +26,7 @@ import BugDetailPage from './pages/bugs/BugDetailPage';
 import AnalyticsPage from './pages/analytics/AnalyticsPage';
 import AgentsPage from './pages/agents/AgentsPage';
 import IntegrationsPage from './pages/integrations/IntegrationsPage';
+import DocumentationPage from './pages/DocumentationPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import ProfileSettingsPage from './pages/settings/ProfileSettingsPage';
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
@@ -90,6 +91,7 @@ function App() {
             <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
             <Route path="/agents" element={<ProtectedRoute><AgentsPage /></ProtectedRoute>} />
             <Route path="/integrations" element={<ProtectedRoute><IntegrationsPage /></ProtectedRoute>} />
+            <Route path="/docs" element={<ProtectedRoute><DocumentationPage /></ProtectedRoute>} />
 
             <Route path="/settings" element={<ProtectedRoute><SettingsLayout /></ProtectedRoute>}>
               <Route index element={<Navigate to="/settings/profile" replace />} />
@@ -107,7 +109,7 @@ function App() {
           </Routes>
           </ErrorBoundary>
         </div>
-        <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#1a1a1a', color: '#fafafa', border: '1px solid #2a2a2a' } }} />
+        <PopupViewport />
       </Router>
     </QueryClientProvider>
   );

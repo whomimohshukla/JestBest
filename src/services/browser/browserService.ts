@@ -119,42 +119,18 @@ export const browserService = {
       const links = await page.$$eval('a[href]', (anchors) =>
         anchors.map((a) => (a as HTMLAnchorElement).href).filter(Boolean)
       );
+      // This callback is serialised and evaluated inside the browser, so it must
+      // not declare any named functions: esbuild's `keepNames` transform rewrites
+      // those to call a `__name()` helper that does not exist in the page, which
+      // throws "ReferenceError: __name is not defined". The traversal is therefore
+      // iterative and the selector is built inline.
       const components = await page.evaluate(() => {
-        const buildCssSelector = (element: Element): string | null => {
-          if (element.id) {
-            return `#${CSS.escape(element.id)}`;
-          }
-          if (element.hasAttribute('data-testid')) {
-            return `[data-testid="${CSS.escape(element.getAttribute('data-testid') ?? '')}"]`;
-          }
-          const path: string[] = [];
-          let current: Element | null = element;
-          while (current && current !== document.body && path.length < 8) {
-            let segment = current.tagName.toLowerCase();
-            if (current.id) {
-              segment = `${segment}#${CSS.escape(current.id)}`;
-            } else {
-              const parent = current.parentElement;
-              if (parent) {
-                const siblings = Array.from(parent.children).filter(
-                  (child) => child.tagName === (current as Element).tagName
-                );
-                if (siblings.length > 1) {
-                  segment = `${segment}:nth-of-type(${siblings.indexOf(current) + 1})`;
-                }
-              }
-            }
-            path.unshift(segment);
-            current = current.parentElement;
-          }
-          const selector = path.join(' > ');
-          if (!selector) return null;
-          return selector.slice(0, 200);
-        };
-
         const results: Array<{ name: string | null; selector: string; type: string }> = [];
         const seen = new Set<string>();
-        const visits = (element: Element) => {
+        const stack: Element[] = document.body ? [document.body] : [];
+
+        while (stack.length > 0 && results.length < 200) {
+          const element = stack.pop() as Element;
           const tag = element.tagName.toLowerCase();
           let type: string = tag;
           if (tag === 'input' || tag === 'textarea' || tag === 'select' || tag === 'button') {
@@ -175,8 +151,39 @@ export const browserService = {
           const interesting =
             ['input', 'textarea', 'select', 'button', 'a', 'form', 'table', 'nav'].includes(tag) ||
             element.hasAttribute('role');
+
           if (interesting) {
-            const selector = buildCssSelector(element);
+            let selector: string | null = null;
+            if (element.id) {
+              selector = `#${CSS.escape(element.id)}`;
+            } else if (element.hasAttribute('data-testid')) {
+              selector = `[data-testid="${CSS.escape(element.getAttribute('data-testid') ?? '')}"]`;
+            } else {
+              const path: string[] = [];
+              let current: Element | null = element;
+              while (current && current !== document.body && path.length < 8) {
+                let segment = current.tagName.toLowerCase();
+                if (current.id) {
+                  segment = `${segment}#${CSS.escape(current.id)}`;
+                } else {
+                  const parent = current.parentElement;
+                  if (parent) {
+                    const tagName = current.tagName;
+                    const siblings = Array.from(parent.children).filter(
+                      (child) => child.tagName === tagName
+                    );
+                    if (siblings.length > 1) {
+                      segment = `${segment}:nth-of-type(${siblings.indexOf(current) + 1})`;
+                    }
+                  }
+                }
+                path.unshift(segment);
+                current = current.parentElement;
+              }
+              const joined = path.join(' > ');
+              if (joined) selector = joined.slice(0, 200);
+            }
+
             if (selector && !seen.has(selector)) {
               seen.add(selector);
               const name =
@@ -186,11 +193,13 @@ export const browserService = {
               results.push({ name: name || null, selector, type });
             }
           }
-          for (const child of Array.from(element.children)) {
-            if (results.length < 200) visits(child);
+
+          // Push in reverse so the stack yields the same pre-order as recursion.
+          const children = Array.from(element.children);
+          for (let i = children.length - 1; i >= 0; i -= 1) {
+            stack.push(children[i]);
           }
-        };
-        visits(document.body);
+        }
         return results;
       });
 

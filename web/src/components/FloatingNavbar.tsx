@@ -45,7 +45,7 @@ export function FloatingNavbar() {
       >
         <div className="flex items-center justify-between gap-2">
           <Link to="/" className="flex items-center pl-1">
-            <Logo variant="mark" size={30} />
+            <Logo variant="mark" size={30} showCaption />
           </Link>
 
           <nav className="hidden lg:flex items-center gap-0.5">

@@ -42,7 +42,16 @@ export const applicationsApi = {
     apiPatch<Application>(`/applications/${id}`, data),
   remove: (id: string) => apiDelete<{ message: string }>(`/applications/${id}`),
   map: (id: string) => apiGet<Record<string, unknown>>(`/applications/${id}/map`),
-  scan: (id: string) => apiPost<Record<string, unknown>>(`/applications/${id}/scan`),
+  scan: (id: string) =>
+    apiPost<{ scanId: string }>(`/applications/${id}/scan`),
+  scanStatus: (id: string, scanId: string) =>
+    apiGet<{
+      id: string;
+      completedAt: string | null;
+      pagesDiscovered: number;
+      componentsDiscovered: number;
+      workflowsDiscovered: number;
+    }>(`/applications/${id}/scan/${scanId}`),
   addEnvironment: (id: string, data: Record<string, unknown>) =>
     apiPost<Record<string, unknown>>(`/applications/${id}/environments`, data),
   addTestUser: (id: string, data: Record<string, unknown>) =>

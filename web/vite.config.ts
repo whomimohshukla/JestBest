@@ -25,6 +25,9 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
+        // Notifications render as large centred dialogs (PopupViewport) rather
+        // than corner toasts. Alias the library so no call site has to change.
+        'react-hot-toast': fileURLToPath(new URL('./src/lib/toast.ts', import.meta.url)),
       },
     },
     server: {

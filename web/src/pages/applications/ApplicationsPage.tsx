@@ -5,13 +5,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi, applicationsApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
-import { PageLoader, Select, EmptyState, Badge } from '../../components/ui';
+import { PageLoader, Select, EmptyState, Badge, HowToBox } from '../../components/ui';
 import {
   Plus,
   Globe,
   FolderKanban,
   Trash2,
   ScanSearch,
+  FlaskConical,
   Loader2,
   Layers,
   Calendar,
@@ -27,6 +28,12 @@ export default function ApplicationsPage() {
     searchParams.get('projectId')
   );
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [scanningAppId, setScanningAppId] = useState<string | null>(null);
+  const [scanSummary, setScanSummary] = useState<{
+    appId: string;
+    pages: number;
+    components: number;
+  } | null>(null);
   const [newApp, setNewApp] = useState({
     name: '',
     baseUrl: '',
@@ -55,7 +62,7 @@ export default function ApplicationsPage() {
       if (selectedProjectId) {
         queryClient.invalidateQueries({ queryKey: ['applications', selectedProjectId] });
       }
-      toast.success('Application created successfully! 🎉');
+      toast.success('Application created successfully!');
       setShowCreateModal(false);
       setNewApp({ name: '', baseUrl: '', description: '', type: 'WEB' });
     },
@@ -65,11 +72,46 @@ export default function ApplicationsPage() {
   });
 
   const scanMutation = useMutation({
-    mutationFn: (id: string) => applicationsApi.scan(id),
-    onSuccess: () => {
-      toast.success('Scan queued');
+    mutationFn: async (id: string) => {
+      const result = await applicationsApi.scan(id);
+      const scanId = result?.scanId;
+      if (!scanId) return result;
+
+      // Poll until the scan completes so the button reflects real work rather
+      // than resolving the instant the job is queued.
+      const deadline = Date.now() + 120000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        const status = await applicationsApi.scanStatus(id, scanId).catch(() => null);
+        if (status?.completedAt) {
+          setScanSummary({
+            appId: id,
+            pages: status.pagesDiscovered,
+            components: status.componentsDiscovered,
+          });
+          break;
+        }
+      }
+      return result;
+    },
+    onSuccess: (_result, appId) => {
+      if (selectedProjectId) {
+        queryClient.invalidateQueries({ queryKey: ['applications', selectedProjectId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['test-cases'] });
+
+      const summary = scanSummary;
+      if (summary && summary.appId === appId) {
+        toast.success(
+          `Scan complete: ${summary.pages} page(s), ${summary.components} component(s). Test cases generated.`
+        );
+      } else {
+        toast.success('Scan finished. Test cases generated.');
+      }
+      setScanningAppId(null);
     },
     onError: (error) => {
+      setScanningAppId(null);
       toast.error(getErrorMessage(error));
     },
   });
@@ -128,6 +170,32 @@ export default function ApplicationsPage() {
           </button>
         </div>
 
+        <HowToBox
+          title="How to scan an application"
+          steps={[
+            {
+              title: 'Pick a project',
+              text: 'Applications belong to a project. Choose one from the dropdown above.',
+              icon: FolderKanban,
+            },
+            {
+              title: 'Register the app',
+              text: 'Add the base URL you want tested, for example https://example.com.',
+              icon: Globe,
+            },
+            {
+              title: 'Press Scan',
+              text: 'The explorer crawls the site, then test cases are generated for you.',
+              icon: ScanSearch,
+            },
+            {
+              title: 'Review the results',
+              text: 'Open Test Cases to see what was generated, then run a suite.',
+              icon: FlaskConical,
+            },
+          ]}
+        />
+
         {/* Project Selector */}
         <div className="mb-8">
           <Select
@@ -152,10 +220,10 @@ export default function ApplicationsPage() {
         {isError && (
           <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-card/50 px-6 py-16 text-center">
             <p className="text-sm font-medium text-red-400">Failed to load applications.</p>
-            <p className="text-sm text-muted-foreground">{projectsError ? '' : 'Check your connection and try again.'}</p>            <button
+            <p className="text-sm text-muted-foreground">{projectsError ? '' : 'Check your connection and try again.'}</p><button
               onClick={() => refetch()}
               disabled={isFetching}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
             >
               {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               Retry
@@ -233,11 +301,14 @@ export default function ApplicationsPage() {
 
                 <div className="flex gap-2 pt-4 border-t border-border">
                   <button
-                    onClick={() => scanMutation.mutate(app.id)}
+                    onClick={() => {
+                      setScanningAppId(app.id);
+                      scanMutation.mutate(app.id);
+                    }}
                     disabled={scanMutation.isPending}
                     className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-600/90 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                   >
-                    {scanMutation.isPending ? (
+                    {scanMutation.isPending && scanningAppId === app.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <ScanSearch className="w-4 h-4" />

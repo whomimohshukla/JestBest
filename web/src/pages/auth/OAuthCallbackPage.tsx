@@ -26,7 +26,13 @@ export default function OAuthCallbackPage() {
     hasRun.current = true;
 
     if (!provider || !code) {
-      toast.error('Sign in was cancelled or failed');
+      // Cancelled at the provider, not a crash. This fires on the login page
+      // after redirect, so it is a warning the user dismisses, not an error.
+      toast.warning(
+        provider
+          ? `${provider} sign-in was cancelled or came back without a code. Nothing was changed.`
+          : 'Sign-in was cancelled before it started. Nothing was changed.'
+      );
       navigate('/auth/login');
       return;
     }
@@ -35,7 +41,7 @@ export default function OAuthCallbackPage() {
       try {
         const result = await authApi.oauthCallback(provider, code, state ?? undefined);
         setAuth(result);
-        toast.success('Welcome to JestBest 🎉');
+        toast.success('Welcome to JestBest');
         navigate('/dashboard');
       } catch (error) {
         setErrorMessage(getErrorMessage(error));

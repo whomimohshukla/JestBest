@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CheckCircle2,
@@ -35,7 +35,7 @@ const runSteps: RunStep[] = [
 ];
 
 const toneClass: Record<Tone, { text: string; ring: string; dot: string }> = {
-  muted: { text: 'text-zinc-500', ring: 'border-white/10', dot: 'bg-zinc-600' },
+  muted: { text: 'text-zinc-400', ring: 'border-white/10', dot: 'bg-zinc-500' },
   info: { text: 'text-zinc-300', ring: 'border-white/12', dot: 'bg-red-500' },
   pass: { text: 'text-emerald-400', ring: 'border-emerald-500/25', dot: 'bg-emerald-500' },
   warn: { text: 'text-amber-400', ring: 'border-amber-500/25', dot: 'bg-amber-500' },
@@ -45,17 +45,35 @@ const toneClass: Record<Tone, { text: string; ring: string; dot: string }> = {
 const VISIBLE = 4;
 const STEP_MS = 900;
 
-function useLoopingStep(length: number, intervalMs: number) {
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function subscribeToReducedMotion(onChange: () => void) {
+  const mq = window.matchMedia(REDUCED_MOTION_QUERY);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
+function usePrefersReducedMotion() {
+  return useSyncExternalStore(
+    subscribeToReducedMotion,
+    () => window.matchMedia(REDUCED_MOTION_QUERY).matches,
+    () => false,
+  );
+}
+
+function useLoopingStep(length: number, intervalMs: number, paused: boolean) {
   const [step, setStep] = useState(0);
 
   useEffect(() => {
+    if (paused) return;
     const id = window.setInterval(() => {
       setStep((s) => (s + 1) % length);
     }, intervalMs);
     return () => window.clearInterval(id);
-  }, [length, intervalMs]);
+  }, [length, intervalMs, paused]);
 
-  return step;
+  // Reduced-motion users get the finished run held on screen instead of a loop.
+  return paused ? length - 1 : step;
 }
 
 /**
@@ -66,7 +84,8 @@ function useLoopingStep(length: number, intervalMs: number) {
  * static screenshot. Paused for users who ask for reduced motion.
  */
 export function RunConsole() {
-  const step = useLoopingStep(runSteps.length, STEP_MS);
+  const reducedMotion = usePrefersReducedMotion();
+  const step = useLoopingStep(runSteps.length, STEP_MS, reducedMotion);
   const progress = ((step + 1) / runSteps.length) * 100;
 
   const visible = runSteps
@@ -86,13 +105,13 @@ export function RunConsole() {
             <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
             <span className="h-2.5 w-2.5 rounded-full bg-white/20" />
           </div>
-          <p className="font-mono text-[11px] text-zinc-500">jestbest run --live</p>
+          <p className="font-mono text-[11px] text-zinc-400">jestbest run --live</p>
           <div className="ml-auto flex items-center gap-1.5 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
             </span>
-            <span className="font-mono text-[10px] uppercase tracking-wider text-red-400">live</span>
+            <span className="font-mono text-[11px] uppercase tracking-wider text-red-400">live</span>
           </div>
         </div>
 
@@ -102,8 +121,12 @@ export function RunConsole() {
           <motion.div
             aria-hidden
             className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-red-500/[0.07] to-transparent"
-            animate={{ y: [-64, 248] }}
-            transition={{ duration: 3.2, repeat: Infinity, ease: 'linear' }}
+            animate={reducedMotion ? { opacity: 0 } : { y: [-64, 248] }}
+            transition={
+              reducedMotion
+                ? { duration: 0 }
+                : { duration: 3.2, repeat: Infinity, ease: 'linear' }
+            }
           />
 
           <div className="relative flex h-full flex-col justify-end gap-2">
@@ -128,10 +151,10 @@ export function RunConsole() {
                     >
                       <Icon className={`h-3 w-3 ${tone.text}`} />
                     </span>
-                    <span className="font-mono text-[11px] text-zinc-600">$</span>
+                    <span className="font-mono text-[11px] text-zinc-400">$</span>
                     <span className={`font-mono text-[11px] ${tone.text} ${isLast ? '' : 'opacity-80'}`}>
-                      <span className="text-zinc-600">{entry.label}</span>
-                      <span className="text-zinc-700"> · </span>
+                      <span className="text-zinc-400">{entry.label}</span>
+                      <span className="text-zinc-400"> · </span>
                       {entry.message}
                     </span>
                     {isLast ? (
@@ -150,11 +173,11 @@ export function RunConsole() {
 
         {/* progress */}
         <div className="border-t border-white/10 px-4 py-3">
-          <div className="flex items-center justify-between font-mono text-[10px] text-zinc-600">
+          <div className="flex items-center justify-between font-mono text-[11px] text-zinc-400">
             <span>
               step {Math.min(step + 1, runSteps.length)}/{runSteps.length}
             </span>
-            <span className="text-zinc-500">{Math.round(progress)}%</span>
+            <span className="text-zinc-400">{Math.round(progress)}%</span>
           </div>
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
             <motion.div
@@ -174,8 +197,8 @@ export function RunConsole() {
         className="pointer-events-none absolute -bottom-6 -left-4 hidden items-center gap-2 rounded-xl border border-white/12 bg-black/80 px-3 py-2 backdrop-blur-md sm:flex"
       >
         <TriangleAlert className="h-3.5 w-3.5 text-amber-400" />
-        <span className="font-mono text-[10px] text-zinc-400">flaky</span>
-        <span className="font-mono text-[10px] text-zinc-600">#search-filters</span>
+        <span className="font-mono text-[11px] text-zinc-400">flaky</span>
+        <span className="font-mono text-[11px] text-zinc-400">#search-filters</span>
       </motion.div>
     </div>
   );

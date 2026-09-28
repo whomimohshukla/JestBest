@@ -33,6 +33,17 @@ export const authenticate = (options: AuthenticateOptions = {}) => {
     }
 
     const payload = verifyToken(token, 'access');
+
+    // Intermediate-purpose tokens (email verification, the 2FA challenge) are
+    // signed with the access secret so they can be presented to
+    // /auth/verify-email and /auth/2fa/verify, but they must never act as a
+    // session. They carry a real orgId and roles, so without this check a
+    // `purpose: '2fa'` token is a complete two-factor bypass and a
+    // `purpose: 'verification'` token skips email verification.
+    if (payload.type !== 'access' || payload.purpose) {
+      throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+
     const redis = getRedis();
     const blacklisted = await redis.get(`auth:blacklist:${payload.jti ?? ''}`);
     if (blacklisted) {
@@ -60,15 +71,15 @@ export const authenticate = (options: AuthenticateOptions = {}) => {
       throw new ForbiddenError(Messages.AUTH.ACCOUNT_SUSPENDED_UNTIL(user.suspendedUntil.toISOString()));
     }
 
-    // A password change (or reset) bumps this epoch, which retroactively
+    // A password change (or reset) bumps this counter, which retroactively
     // invalidates every access token issued before it. Access tokens are
     // stateless, so revoking refresh tokens alone would leave a stolen access
-    // token usable until it expired.
-    if (payload.iat) {
-      const epoch = await tokenService.passwordEpoch(payload.sub);
-      if (epoch && payload.iat < epoch) {
-        throw new UnauthorizedError(Messages.AUTH.SESSION_REVOKED);
-      }
+    // token usable until it expired. Tokens minted before this claim existed
+    // carry no `pv` and count as version 0: they keep working until the user's
+    // next password change, so deploying this does not sign everyone out.
+    const currentVersion = await tokenService.passwordVersion(payload.sub);
+    if ((payload.pv ?? 0) !== currentVersion) {
+      throw new UnauthorizedError(Messages.AUTH.SESSION_REVOKED);
     }
 
     const membership = user.memberships[0];

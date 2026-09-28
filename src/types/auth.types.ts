@@ -10,6 +10,15 @@ export interface JwtPayload {
   jti?: string;
   exp?: number;
   iat?: number;
+  /**
+   * Password version at mint time. A password change increments the stored
+   * version, so any token carrying a lower value is revoked. A monotonic
+   * counter is used rather than a timestamp because JWT `iat` has one-second
+   * granularity: a token minted in the same second as the password change
+   * cannot be ordered against it. Missing `pv` means 0, so tokens issued
+   * before this claim existed keep working until the next password change.
+   */
+  pv?: number;
   purpose?: '2fa' | 'verification' | 'password-reset';
 }
 
