@@ -27,7 +27,8 @@ export const bugRepository = {
       },
     }),
 
-  assign: (id: string, assigneeId: string) => prisma.bug.update({ where: { id }, data: { assigneeId } }),
+  assign: (id: string, assigneeId: string | null) =>
+    prisma.bug.update({ where: { id }, data: { assigneeId } }),
 
   addComment: (data: Prisma.BugCommentUncheckedCreateInput) => prisma.bugComment.create({ data }),
 
