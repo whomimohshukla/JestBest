@@ -24,8 +24,11 @@ import {
   HowToBox,
   FieldError } from '../../components/ui';
 import type { TestRun, TestCase } from '../../types';
+import { hasActiveItems, pollWhileActive } from '../../lib/polling';
 
-const STATUS_FILTERS = ['ALL', 'PENDING', 'QUEUED', 'RUNNING', 'PASSED', 'FAILED', 'CANCELLED'] as const;
+// QUEUED is the UI alias for the backend's PENDING. ERRORED is intentionally
+// absent: it is not a real TestStatus value.
+const STATUS_FILTERS = ['ALL', 'PENDING', 'RUNNING', 'PASSED', 'FAILED', 'SKIPPED', 'CANCELLED'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 
 export default function TestRunsPage() {
@@ -47,6 +50,8 @@ export default function TestRunsPage() {
         ...(selectedProjectId ? { projectId: selectedProjectId } : {}),
         ...(statusFilter !== 'ALL' ? { status: statusFilter } : {}),
       }),
+    // Runs execute in the background; keep the list current until they settle.
+    refetchInterval: (q) => pollWhileActive(() => hasActiveItems(q.state.data?.items)),
   });
 
   const { data: projectList } = useQuery({

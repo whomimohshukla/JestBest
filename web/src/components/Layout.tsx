@@ -111,7 +111,7 @@ export default function Layout({ children }: LayoutProps) {
                 className="flex items-center gap-2 rounded-full p-1 hover:ring-2 hover:ring-red-500/50 transition-all"
                 aria-label="Profile menu"
               >
-                <div className="w-9 h-9 rounded-full  from-red-600 to-red-700 flex items-center justify-center text-sm font-semibold text-white">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-r from-red-600 to-red-700 flex items-center justify-center text-sm font-semibold text-white">
                   {initial}
                 </div>
                 <ChevronRight className="w-4 h-4 text-muted-foreground hidden sm:block rotate-90" />

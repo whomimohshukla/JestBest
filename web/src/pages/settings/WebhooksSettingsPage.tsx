@@ -6,9 +6,19 @@ import { getErrorMessage } from '../../api/client';
 import { PageLoader, Badge, FieldError } from '../../components/ui';
 import { ChevronDown, Loader2, Plus, RefreshCw, Trash2, Webhook as WebhookIcon, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
-import type { Webhook, WebhookDelivery } from '../../types';
+import type { Webhook, WebhookDelivery, WebhookEventType } from '../../types';
 
-const EVENT_OPTIONS = ['test_run.completed', 'test_run.failed', 'bug.created', 'bug.status_changed'];
+// Values must match the Prisma WebhookEventType enum exactly; the API 400s otherwise.
+const EVENT_OPTIONS: { value: WebhookEventType; label: string }[] = [
+  { value: 'TEST_STARTED', label: 'Test run started' },
+  { value: 'TEST_COMPLETED', label: 'Test run completed' },
+  { value: 'TEST_FAILED', label: 'Test run failed' },
+  { value: 'BUG_CREATED', label: 'Bug created' },
+  { value: 'BUG_FIXED', label: 'Bug fixed' },
+  { value: 'DEPLOYMENT_STARTED', label: 'Deployment started' },
+  { value: 'DEPLOYMENT_COMPLETED', label: 'Deployment completed' },
+  { value: 'DEPLOYMENT_FAILED', label: 'Deployment failed' },
+];
 
 function WebhookDeliveries({ webhookId }: { webhookId: string }) {
   const { data: deliveries, isLoading } = useQuery({
@@ -16,9 +26,19 @@ function WebhookDeliveries({ webhookId }: { webhookId: string }) {
     queryFn: () => webhooksApi.deliveries(webhookId),
   });
 
-  const statusColor = (status: WebhookDelivery['status']) => {
-    if (status === 'SUCCESS') return 'bg-emerald-500/15 text-emerald-400';
-    if (status === 'FAILED') return 'bg-red-500/15 text-red-400';
+  // The API records HTTP outcome (succeededAt/failedAt/nextRetryAt), not a
+  // status enum, so delivery state is derived from those timestamps.
+  const deliveryStatus = (d: WebhookDelivery) => {
+    if (d.succeededAt) return 'Delivered';
+    if (d.failedAt && d.nextRetryAt) return 'Retrying';
+    if (d.failedAt) return 'Failed';
+    return 'Pending';
+  };
+
+  const deliveryStatusColor = (d: WebhookDelivery) => {
+    const s = deliveryStatus(d);
+    if (s === 'Delivered') return 'bg-emerald-500/15 text-emerald-400';
+    if (s === 'Failed') return 'bg-red-500/15 text-red-400';
     return 'bg-yellow-500/15 text-yellow-400';
   };
 
@@ -42,15 +62,15 @@ function WebhookDeliveries({ webhookId }: { webhookId: string }) {
             <tbody>
               {deliveries.map((d) => (
                 <tr key={d.id} className="border-b border-border/50">
-                  <td className="py-2 pr-4 font-mono text-xs">{d.event}</td>
+                  <td className="py-2 pr-4 font-mono text-xs">{d.eventType}</td>
                   <td className="py-2 pr-4">
                     <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor(d.status)}`}
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${deliveryStatusColor(d)}`}
                     >
-                      {d.status}
+                      {deliveryStatus(d)}
                     </span>
                   </td>
-                  <td className="py-2 pr-4">{d.responseCode ?? '—'}</td>
+                  <td className="py-2 pr-4">{d.responseStatus ?? '—'}</td>
                   <td className="py-2 pr-4">{d.attempts}</td>
                   <td className="py-2">{new Date(d.createdAt).toLocaleString()}</td>
                 </tr>
@@ -69,8 +89,8 @@ export default function WebhooksSettingsPage() {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [form, setForm] = useState({ url: '', secret: '', events: [] as string[] });
-  const [formErrors, setFormErrors] = useState<{ url?: string; events?: string }>({});
+  const [form, setForm] = useState({ url: '', secret: '', eventTypes: [] as WebhookEventType[] });
+  const [formErrors, setFormErrors] = useState<{ url?: string; eventTypes?: string }>({});
 
   const { data: webhooks, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['webhooks'],
@@ -78,12 +98,13 @@ export default function WebhooksSettingsPage() {
   });
 
   const createWebhookMutation = useMutation({
-    mutationFn: (data: { url: string; events: string[]; secret: string }) => webhooksApi.create(data),
+    mutationFn: (data: { url: string; eventTypes: string[]; secret: string }) =>
+      webhooksApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
       toast.success('Webhook created successfully!');
       setShowModal(false);
-      setForm({ url: '', secret: '', events: [] });
+      setForm({ url: '', secret: '', eventTypes: [] });
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -123,22 +144,22 @@ export default function WebhooksSettingsPage() {
     },
   });
 
-  const toggleEvent = (event: string) => {
-    setFormErrors((p) => (p.events ? { ...p, events: undefined } : p));
+  const toggleEvent = (event: WebhookEventType) => {
+    setFormErrors((p) => (p.eventTypes ? { ...p, eventTypes: undefined } : p));
     setForm((f) => ({
       ...f,
-      events: f.events.includes(event)
-        ? f.events.filter((e) => e !== event)
-        : [...f.events, event],
+      eventTypes: f.eventTypes.includes(event)
+        ? f.eventTypes.filter((e) => e !== event)
+        : [...f.eventTypes, event],
     }));
   };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    const next: { url?: string; events?: string } = {};
+    const next: { url?: string; eventTypes?: string } = {};
     if (!form.url.trim()) next.url = 'Enter the URL that should receive events.';
     else if (!/^https?:\/\/.+/i.test(form.url.trim())) next.url = 'URL must start with http:// or https://';
-    if (form.events.length === 0) next.events = 'Select at least one event to forward.';
+    if (form.eventTypes.length === 0) next.eventTypes = 'Select at least one event to forward.';
     setFormErrors(next);
     if (Object.keys(next).length > 0) return;
     createWebhookMutation.mutate(form);
@@ -225,9 +246,9 @@ export default function WebhooksSettingsPage() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {webhook.events.map((event) => (
+                    {webhook.eventTypes.map((event) => (
                       <Badge key={event} variant="outline" className="text-xs">
-                        {event}
+                        {EVENT_OPTIONS.find((o) => o.value === event)?.label ?? event}
                       </Badge>
                     ))}
                   </div>
@@ -329,25 +350,25 @@ export default function WebhooksSettingsPage() {
               <div>
                 <label className="block text-sm font-medium mb-2">Events</label>
                 <div
-                  className={`space-y-2 rounded-lg transition-colors ${formErrors.events ? 'ring-1 ring-red-500/40' : ''}`}
-                  aria-describedby={formErrors.events ? 'webhook-events-error' : undefined}
+                  className={`space-y-2 rounded-lg transition-colors ${formErrors.eventTypes ? 'ring-1 ring-red-500/40' : ''}`}
+                  aria-describedby={formErrors.eventTypes ? 'webhook-events-error' : undefined}
                 >
-                  {EVENT_OPTIONS.map((event) => (
+                  {EVENT_OPTIONS.map(({ value: event, label }) => (
                     <label
                       key={event}
                       className="flex items-center gap-3 px-3 py-2 bg-secondary/30 border border-border rounded-lg cursor-pointer"
                     >
                       <input
                         type="checkbox"
-                        checked={form.events.includes(event)}
+                        checked={form.eventTypes.includes(event)}
                         onChange={() => toggleEvent(event)}
                         className="accent-primary"
                       />
-                      <span className="text-sm font-mono">{event}</span>
+                      <span className="text-sm">{label}</span>
                     </label>
                   ))}
                 </div>
-                <FieldError id="webhook-events-error">{formErrors.events}</FieldError>
+                <FieldError id="webhook-events-error">{formErrors.eventTypes}</FieldError>
               </div>
 
               <div className="flex gap-3 pt-4">

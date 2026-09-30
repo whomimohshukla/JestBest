@@ -22,6 +22,7 @@ import toast from 'react-hot-toast';
 import { PageLoader, EmptyState, Select, HowToBox } from '../../components/ui';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/ui';
 import type { AgentRun } from '../../types';
+import { hasActiveItems, pollWhileActive } from '../../lib/polling';
 import type { LucideIcon } from 'lucide-react';
 
 const AGENT_PROFILES: Record<string, { label: string; icon: LucideIcon; description: string }> = {
@@ -88,6 +89,9 @@ export default function AgentsPage() {
   const { data: runList, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['agent-runs'],
     queryFn: () => agentsApi.runs({ pageSize: 100 }),
+    // Agent runs execute asynchronously; refresh until they settle.
+    refetchInterval: (q) =>
+      pollWhileActive(() => hasActiveItems(q.state.data?.items as AgentRun[] | undefined)),
   });
 
   const { data: projectList } = useQuery({

@@ -113,7 +113,7 @@ export default function AnalyticsPage() {
                       </div>
                       <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
                         <div
-                          className="h-full rounded-full  from-red-600 to-red-700 transition-all"
+                          className="h-full rounded-full bg-gradient-to-r from-red-600 to-red-700 transition-all"
                           style={{ width: `${Math.min(100, item.value)}%` }}
                         />
                       </div>

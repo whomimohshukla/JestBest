@@ -27,6 +27,7 @@ import {
   TableCell,
 } from '../../components/ui';
 import type { TestRun, TestResult } from '../../types';
+import { isActiveRecord, pollWhileActive } from '../../lib/polling';
 
 const RESULT_STATUS_COLORS: Record<string, string> = {
   PASSED: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20',
@@ -49,12 +50,15 @@ export default function TestRunDetailPage() {
     queryKey: ['test-run', runId],
     queryFn: () => testRunsApi.get(runId as string),
     enabled: !!runId,
+    // Follow the run while it executes, then stop.
+    refetchInterval: (q) => pollWhileActive(() => isActiveRecord(q.state.data), 3000),
   });
 
   const cancelRunMutation = useMutation({
     mutationFn: (id: string) => testRunsApi.cancel(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['test-run', runId] });
+      queryClient.invalidateQueries({ queryKey: ['test-runs'] });
       toast.success('Test run cancelled');
     },
     onError: (error) => {

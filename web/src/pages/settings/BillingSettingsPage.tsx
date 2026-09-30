@@ -128,7 +128,7 @@ export default function BillingSettingsPage() {
             </div>
             <div className="h-3 bg-secondary/50 rounded-full overflow-hidden">
               <div
-                className="h-full  from-red-600 to-red-700 rounded-full transition-all"
+                className="h-full bg-gradient-to-r from-red-600 to-red-700 rounded-full transition-all"
                 style={{ width: `${percent}%` }}
               />
             </div>

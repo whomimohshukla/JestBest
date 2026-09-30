@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
-import { PageLoader } from '../../components/ui';
+import { PageLoader, FieldError } from '../../components/ui';
 import { Building2, Loader2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -20,6 +20,7 @@ export default function OrganizationSettingsPage() {
   });
 
   const [form, setForm] = useState({ name: '', logo: '' });
+  const [formErrors, setFormErrors] = useState<{ name?: string }>({});
   const [formInitialized, setFormInitialized] = useState(false);
 
   // Seed the form from the server response during render rather than in an
@@ -31,7 +32,10 @@ export default function OrganizationSettingsPage() {
   }
 
   const updateOrgMutation = useMutation({
-    mutationFn: (data: { name: string; logo: string }) =>
+    // The API validates `logo` as a URL and rejects an empty string, so the key
+    // is omitted entirely when no logo is set. Sending `logo: ''` made every
+    // save without a logo fail with a 400.
+    mutationFn: (data: { name: string; logo?: string }) =>
       organizationApi.update(orgId as string, data),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['org', orgId] });
@@ -45,7 +49,13 @@ export default function OrganizationSettingsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateOrgMutation.mutate(form);
+    if (!form.name.trim()) {
+      setFormErrors({ name: 'Enter an organization name.' });
+      return;
+    }
+    setFormErrors({});
+    const logo = form.logo.trim();
+    updateOrgMutation.mutate({ name: form.name.trim(), ...(logo ? { logo } : {}) });
   };
 
   if (isLoading && !org) {
@@ -86,16 +96,25 @@ export default function OrganizationSettingsPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Organization Name</label>
+            <label htmlFor="org-name" className="block text-sm font-medium mb-2">
+              Organization Name
+            </label>
             <input
+              id="org-name"
               type="text"
               value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+              onChange={(e) => {
+                setForm({ ...form, name: e.target.value });
+                if (formErrors.name) setFormErrors({});
+              }}
+              className={`w-full px-4 py-3 bg-secondary/50 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 ${formErrors.name ? 'border-red-500/70 ring-1 ring-red-500/40' : 'border-border'}`}
               placeholder="Acme Corp"
               disabled={updateOrgMutation.isPending}
+              aria-invalid={!!formErrors.name}
+              aria-describedby={formErrors.name ? 'org-name-error' : undefined}
               required
             />
+            <FieldError id="org-name-error">{formErrors.name}</FieldError>
           </div>
 
           <div>
