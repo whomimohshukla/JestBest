@@ -32,7 +32,9 @@ export const changeBugStatusSchema = z.object({
 });
 
 export const assignBugSchema = z.object({
-  assigneeId: z.string().min(1),
+  // `null` clears the assignee. The UI exposes an explicit "Unassigned"
+  // option, which previously 400'd because only a non-empty string was allowed.
+  assigneeId: z.string().min(1).nullable(),
 });
 
 export const addBugCommentSchema = z.object({
