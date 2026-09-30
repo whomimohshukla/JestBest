@@ -59,7 +59,8 @@ export const bugService = {
     return bugRepository.changeStatus(bugId, status as Prisma.BugCreateInput['status']);
   },
 
-  async assign(bugId: string, assigneeId: string): Promise<Bug> {
+  /** Pass `null` to clear the assignee. */
+  async assign(bugId: string, assigneeId: string | null): Promise<Bug> {
     await bugService.get(bugId);
     return bugRepository.assign(bugId, assigneeId);
   },
