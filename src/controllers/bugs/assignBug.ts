@@ -10,7 +10,8 @@ import { notificationService } from '../../services/notification/notificationSer
 
 export const assignBug = async (req: Request, res: Response): Promise<void> => {
   const { bugId } = req.params as { bugId: string };
-  const { assigneeId } = req.body as { assigneeId: string };
+  // `null` means "unassign"; a non-null value must be an org member.
+  const { assigneeId } = req.body as { assigneeId: string | null };
   const existing = await bugService.get(bugId);
   const project = await prisma.project.findUnique({ where: { id: existing.projectId } });
   if (req.orgId && project?.organizationId !== req.orgId) {
@@ -20,9 +21,11 @@ export const assignBug = async (req: Request, res: Response): Promise<void> => {
   // bug can be assigned to an arbitrary user id, leaking the relationship across
   // tenant boundaries and notifying a user who has no access to the project.
   const organizationId = project?.organizationId ?? existing.organizationId;
-  const membership = await organizationRepository.findMembership(organizationId, assigneeId);
-  if (!membership) {
-    throw new ForbiddenError(Messages.ORG.MEMBER_NOT_FOUND);
+  if (assigneeId !== null) {
+    const membership = await organizationRepository.findMembership(organizationId, assigneeId);
+    if (!membership) {
+      throw new ForbiddenError(Messages.ORG.MEMBER_NOT_FOUND);
+    }
   }
   const bug = await bugService.assign(bugId, assigneeId);
   if (req.orgId && req.user) {
