@@ -367,13 +367,27 @@ export interface Integration {
   updatedAt: string;
 }
 
+/** Must match the Prisma `WebhookEventType` enum; the API rejects anything else. */
+export type WebhookEventType =
+  | 'TEST_STARTED'
+  | 'TEST_COMPLETED'
+  | 'TEST_FAILED'
+  | 'BUG_CREATED'
+  | 'BUG_FIXED'
+  | 'DEPLOYMENT_STARTED'
+  | 'DEPLOYMENT_COMPLETED'
+  | 'DEPLOYMENT_FAILED';
+
 export interface Webhook {
   id: string;
   organizationId: string;
+  projectId: string | null;
   url: string;
-  secret: string | null;
-  events: string[];
+  secret: string;
+  eventTypes: WebhookEventType[];
   isActive: boolean;
+  lastTriggeredAt: string | null;
+  failureCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -381,11 +395,15 @@ export interface Webhook {
 export interface WebhookDelivery {
   id: string;
   webhookId: string;
-  event: string;
+  eventType: WebhookEventType;
   payload: Record<string, unknown>;
-  status: 'SUCCESS' | 'FAILED' | 'RETRYING';
-  responseCode: number | null;
+  /** The API persists the HTTP status directly; there is no separate status field. */
+  responseStatus: number | null;
+  responseBody: string | null;
   attempts: number;
+  nextRetryAt: string | null;
+  succeededAt: string | null;
+  failedAt: string | null;
   createdAt: string;
 }
 

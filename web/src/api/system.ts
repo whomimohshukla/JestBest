@@ -47,7 +47,7 @@ export const integrationsApi = {
 export const webhooksApi = {
   list: () => apiGet<Webhook[]>('/webhooks'),
   get: (id: string) => apiGet<Webhook>(`/webhooks/${id}`),
-  create: (data: { url: string; events: string[]; secret?: string }) =>
+  create: (data: { url: string; eventTypes: string[]; secret?: string }) =>
     apiPost<Webhook>('/webhooks', data),
   update: (id: string, data: Record<string, unknown>) =>
     apiPatch<Webhook>(`/webhooks/${id}`, data),

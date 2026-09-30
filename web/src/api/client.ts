@@ -110,12 +110,18 @@ apiClient.interceptors.response.use(
     }
 
     // Global server/network down handling: no HTTP response means the backend
-    // is unreachable, a timeout, or a 502/503/504 gateway failure.
+    // is unreachable, a timeout, or a gateway failure. A plain 5xx is the
+    // server responding with an application error, which is NOT the same as
+    // being offline — treating it as offline raised a false "server offline"
+    // banner for ordinary backend bugs.
+    const status = error.response?.status;
     const transportDown = !error.response ||
       error.code === 'ERR_NETWORK' ||
       error.code === 'ECONNABORTED' ||
       error.code === 'ETIMEDOUT' ||
-      (error.response?.status != null && error.response.status >= 500);
+      status === 502 ||
+      status === 503 ||
+      status === 504;
 
     if (transportDown) {
       useBackendStore.setState({ status: 'offline' });
