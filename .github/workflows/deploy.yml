@@ -1,0 +1,106 @@
+# CD: after CI passes on main, ship it to AWS.
+#
+#   checkout → OIDC assume role → build images → push to ECR
+#           → copy compose to the EC2 host → `compose pull && up`
+#
+# Why OIDC instead of an access key: GitHub proves its identity to AWS with a
+# short-lived token, so no long-lived AWS secret ever exists in the repository
+# or in workflow logs.
+#
+# Required repository secrets (set once, in Settings → Secrets → Actions):
+#   AWS_REGION    e.g. us-east-1
+#   AWS_ROLE_ARN  IAM role trusted by the GitHub OIDC provider
+#   EC2_HOST      e.g. 54.1.2.3
+#   EC2_SSH_USER  e.g. ubuntu
+#   EC2_SSH_KEY   private key matching the instance key pair
+name: Deploy to AWS
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+# `deploy` only runs when the CI run that triggered it succeeded on main.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # required for OIDC federation
+  contents: read
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+
+jobs:
+  deploy:
+    name: Build, push, roll out
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Compute image tags
+        id: meta
+        run: echo "sha=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/jestbest-api:${{ steps.meta.outputs.sha }}
+            ${{ steps.ecr.outputs.registry }}/jestbest-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./web
+          push: true
+          # Relative, same-origin API path baked into the SPA: nginx proxies
+          # /api to the api container, so no cross-origin call and no CORS.
+          build-args: VITE_API_URL=/api/v1
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/jestbest-web:${{ steps.meta.outputs.sha }}
+            ${{ steps.ecr.outputs.registry }}/jestbest-web:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/key
+          chmod 600 ~/.ssh/key
+          ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Copy deployment assets to the host
+        run: |
+          scp -i ~/.ssh/key -o StrictHostKeyChecking=yes \
+            docker-compose.prod.yml scripts/deploy.sh \
+            "${{ secrets.EC2_SSH_USER }}@${{ secrets.EC2_HOST }}:~/"
+
+      - name: Roll out on the host
+        env:
+          API_IMAGE: ${{ steps.ecr.outputs.registry }}/jestbest-api:${{ steps.meta.outputs.sha }}
+          WEB_IMAGE: ${{ steps.ecr.outputs.registry }}/jestbest-web:${{ steps.meta.outputs.sha }}
+        run: |
+          ssh -i ~/.ssh/key "${{ secrets.EC2_SSH_USER }}@${{ secrets.EC2_HOST }}" \
+            "chmod +x deploy.sh && ECR_REGISTRY='${{ steps.ecr.outputs.registry }}' API_IMAGE='$API_IMAGE' WEB_IMAGE='$WEB_IMAGE' ./deploy.sh"
