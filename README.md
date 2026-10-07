@@ -23,6 +23,7 @@ pgvector knowledge base, and files bugs into GitHub/Jira.
 - [Project layout](#project-layout)
 - [Multi-tenancy and authorization](#multi-tenancy-and-authorization)
 - [Background jobs](#background-jobs)
+- [Performance](#performance)
 - [Testing](#testing)
 - [Frontend notes](#frontend-notes)
 - [Common tasks](#common-tasks)
@@ -389,6 +390,54 @@ Long-running work never happens inside a request. The API enqueues and returns.
 Queue names are namespaced per `NODE_ENV` (see `src/config/queue.ts`), so a test
 run never shares BullMQ state with a dev server running alongside it.
 
+## Performance
+
+Every paginated list endpoint has the same shape: filter on a tenant/scope
+column, optionally filter on a status, then sort `createdAt DESC` and take one
+page. A single-column index can find the rows but cannot satisfy the `ORDER BY`,
+so Postgres builds a top-N sort over every matching row — the cost grows with
+the tenant's history rather than with the page size.
+
+`20261008010000_composite_list_indexes` gives each of those queries an index
+whose column order matches the query exactly:
+
+| Endpoint | Query shape | Index |
+| --- | --- | --- |
+| `GET /bugs` | `WHERE organizationId \| projectId [AND status] ORDER BY createdAt DESC` | `Bug_organizationId_createdAt_idx`, `Bug_projectId_createdAt_idx` |
+| `GET /test-runs` | `WHERE projectId [AND status] ORDER BY createdAt DESC` | `TestRun_projectId_createdAt_idx`, `TestRun_status_createdAt_idx` |
+| `GET /audit-logs` | `WHERE organizationId [AND resourceType] ORDER BY createdAt DESC` | `AuditLog_organizationId_createdAt_idx` |
+| `GET /webhooks/:id/deliveries` | `WHERE webhookId ORDER BY createdAt DESC` | `WebhookDelivery_webhookId_createdAt_idx` |
+| `GET /test-cases` | `WHERE projectId ORDER BY createdAt DESC` | `TestCase_projectId_createdAt_idx` |
+
+The seven single-column indexes each composite replaces (`Bug_projectId_idx`,
+`TestRun_status_idx`, …) are dropped in the same migration. Every one of them is
+a strict leading-column prefix of its replacement, so an equality-only query
+still matches the new index — no query loses coverage. Unscoped `createdAt`
+indexes stay: they remain the right plan for global recency queries with no
+tenant filter.
+
+Measured on 60 000 rows per table in a rolled-back transaction (see the plan
+shape; full `EXPLAIN (ANALYZE, BUFFERS)` output reproduced here):
+
+```text
+-- bug list, one of 25 tenants, status = OPEN, LIMIT 20
+Index Scan Backward using "Bug_organizationId_createdAt_idx"
+  Index Cond: ("organizationId" = 'bulko-7')
+  Rows Removed by Filter: 2400            -- status filtered from the heap
+  Execution Time: 1.423 ms
+
+-- test runs, one project, status = FAILED, LIMIT 20
+Index Scan Backward using "TestRun_projectId_createdAt_idx"
+  Index Cond: ("projectId" = 'bulkp-7')
+  Rows Removed by Filter: 98
+  Execution Time: 0.106 ms
+```
+
+Both plans walk the index in reverse and stop at `LIMIT`; the buffer counts stay
+flat as history grows, because the scan is bounded by the page it returns.
+`__tests__/integration/performance/compositeIndexes.test.ts` asserts the index
+set so a schema edit that silently drops one of them fails CI.
+
 ## Testing
 
 ```bash
@@ -411,19 +460,23 @@ must run serially** — which is why `npm test` passes `--runInBand`. Running
 `__tests__/fixtures/testApp.ts` provides `request()`, `createTestUser()`, and
 `resetDatabase()`, and closes queues/Redis on teardown so Jest can exit.
 
-Current state: **252 tests across 19 suites passing** (last full run).
+Current state: **298 tests across 28 suites passing** on the backend and **26
+tests across 4 suites** in the SPA (`npm test --prefix web`), last full run.
 
 | Suite | What it covers |
 | --- | --- |
 | `unit/utils`, `unit/validators` | slug resolution, pagination, JWT, Zod schemas |
 | `unit/services/stripeWebhook` | signature verification, tampering, replay window |
+| `unit/middleware/errorHandler` | Prisma `P2002`/`P2025` → `409`/`404`, malformed JSON body → `400`, unknown errors logged once and returned as opaque `500` |
 | `rbac`, `validation` | permission matrix, validator edge cases |
 | `integration/auth` | register → verify → login → refresh → `/users/me`, password change |
 | `integration/auth/passwordReset` | purpose-bound + single-use reset tokens, password-epoch session invalidation |
 | `integration/organizations` | cross-tenant isolation, membership, role changes |
+| `integration/organizations/auditLogs` | audit list pagination caps, tenant scoping |
 | `integration/projects` | CRUD, pagination, archiving, dashboard |
 | `integration/testCases` | CRUD, duplicate, archive, filters, generation |
 | `integration/bugs` | CRUD, status, assignment, comments, filters |
+| `integration/testRuns/exactlyOnce` | a run is claimed with an atomic conditional update, so a BullMQ retry cannot execute it twice; cancellation is honoured mid-run |
 | `integration/apiKeys` | issue/revoke, hash never exposed, API-key auth |
 | `integration/integrations` | connecting to a foreign `projectId` is rejected; GitHub resolution prefers the bug's project |
 | `integration/agents` | unimplemented `EXECUTION`/`REPORT_AGENT` return 400, not 500 |
@@ -431,6 +484,12 @@ Current state: **252 tests across 19 suites passing** (last full run).
 | `integration/auth/oauth` | OAuth exchange-token redemption: single-use, atomic under concurrency, no session for a missing user |
 | `integration/webhooks` | signing secret is random and redacted everywhere except create; signature verify/tamper; SSRF targets refused |
 | `integration/organizations/memberAccess` | every role can read the member list; only admins can mutate it |
+| `integration/billing/stripeWebhook` | signature over the exact raw bytes, the subscription row is updated before `200`, and a redelivered event id is acknowledged but applied once |
+| `integration/errors/prismaErrors` | a duplicate invite surfaces as `409 CONFLICT`, a missing row as `404`, through real routes |
+| `integration/health` | liveness vs readiness (`Prisma`, Redis, queue depth), and `503` while the process drains |
+| `integration/notifications/slackNotification` | the Slack payload carries the decrypted config, never the stored ciphertext |
+| `integration/seeds/demoSeed` | the demo workspace is complete (cases, 2 weeks of runs, bugs, usage) and re-running it adds nothing |
+| `integration/performance/compositeIndexes` | the `(scope, createdAt)` index set the list endpoints depend on |
 
 ## Frontend notes
 

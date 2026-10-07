@@ -492,7 +492,7 @@ model TestCase {
   agentRuns             AgentRun[]
   aiEvaluations         AIEvaluation[]
 
-  @@index([projectId])
+  @@index([projectId, createdAt])
   @@index([applicationId])
   @@index([type])
   @@index([archivedAt])
@@ -559,9 +559,9 @@ model TestRun {
   testResults           TestResult[]
   agentRuns             AgentRun[]
 
-  @@index([projectId])
+  @@index([projectId, createdAt])
   @@index([testSuiteId])
-  @@index([status])
+  @@index([status, createdAt])
   @@index([createdAt])
 }
 
@@ -633,8 +633,8 @@ model Bug {
   testResults           TestResult[]
   aiEvaluations         AIEvaluation[]
 
-  @@index([organizationId])
-  @@index([projectId])
+  @@index([organizationId, createdAt])
+  @@index([projectId, createdAt])
   @@index([severity])
   @@index([status])
   @@index([createdAt])
@@ -802,7 +802,7 @@ model WebhookDelivery {
   // Relations
   webhook               Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
 
-  @@index([webhookId])
+  @@index([webhookId, createdAt])
   @@index([eventType])
   @@index([succeededAt])
 }
@@ -887,7 +887,7 @@ model AuditLog {
   user                  User @relation(fields: [userId], references: [id], onDelete: Cascade)
   project               Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
-  @@index([organizationId])
+  @@index([organizationId, createdAt])
   @@index([projectId])
   @@index([userId])
   @@index([resourceType])
