@@ -616,9 +616,48 @@ issue mirroring, Jira/Slack delivery, and the pgvector knowledge base. These nee
 real credentials and a real target site, so they are exercised by the development
 smoke flow rather than by the automated suite.
 
-**Not implemented:** the AI fix agent's end-to-end PR workflow and any genuine
-deployment pipeline (Terraform/Kubernetes/GitHub Actions). Integration config is
-encrypted and stored, but no outbound code-hosting automation runs in production.
+**Not implemented:** the AI fix agent's end-to-end PR workflow, and any
+infrastructure-as-code layer (Terraform/Kubernetes). CI/CD does exist — GitHub
+Actions typechecks, lints, formats, runs the full suite and builds both Docker
+images on every push, then `deploy.yml` ships the API image to an EC2 host over
+SSH (`scripts/deploy.sh`, `docker-compose.prod.yml`); the `images`/`deploy` jobs
+stay red until the repository secrets below are set.
+
+| Secret | Used by |
+| --- | --- |
+| `AWS_ROLE_ARN`, `AWS_REGION` | OIDC login for the image push |
+| `EC2_HOST`, `EC2_SSH_USER`, `EC2_SSH_KEY` | the deploy job |
+
+Integration config is encrypted at rest, but no outbound code-hosting
+automation runs in production: nothing opens a pull request on a customer's
+behalf.
+
+### Delivery guarantees
+
+Three places where "at least once" arrives from the outside and the system has
+to make it behave like "exactly once" or "at most once":
+
+- **Stripe webhooks** are verified over the exact raw bytes, deduplicated by
+  event id (a concurrent redelivery loses the insert race and is acknowledged
+  without re-applying), and applied *synchronously* — the subscription row is
+  updated before the `200`. A failure inside the handler propagates, so the
+  response is a `5xx` and Stripe retries rather than the update being lost.
+- **Test runs** are claimed with an atomic conditional update
+  (`status: PENDING`, or `RUNNING` past a stale-claim threshold) before a worker
+  executes anything, so a BullMQ retry or a second worker cannot run the same
+  case list twice. Finalisation is guarded the same way on `status: RUNNING`.
+- **Process shutdown** flips readiness to `503` first, waits for in-flight
+  requests, then closes workers and connections. `/health/live` answers "the
+  process is up"; `/health/ready` answers "I can serve traffic" (database,
+  Redis, queue depth) and is the endpoint a load balancer should poll.
+
+### Demo data
+
+`npm run seed:demo` (or `SEED_DEMO_DATA=1 npm run prisma:seed`) adds a project,
+five test cases, eight runs spread over two weeks, a bug backlog and three
+months of usage rows, so a fresh install renders a populated dashboard instead
+of empty charts. It is idempotent — re-running against the same database adds
+nothing — which is what makes it safe on an existing environment.
 
 ### Agent types
 
@@ -677,9 +716,11 @@ it must point at the API's callback route, not at the SPA. A
 route at all, so sign-in could never complete. `API_ORIGIN` provides the
 correct default (`${API_ORIGIN}${API_PREFIX}/auth/oauth/github/callback`).
 
-The state is still accepted as optional by the callback; requiring it is the
-obvious next tightening, along with binding it to the initiating browser session
-or adopting PKCE.
+The callback **requires** the state: a missing one fails with `missing_state`
+and an unknown/consumed one with `invalid_state`, both surfaced as an OAuth
+error the SPA turns into a message instead of a silent sign-in failure. The
+state is bound to a Redis entry rather than to the initiating browser session,
+so binding it to a cookie (or adopting PKCE) is the next tightening.
 
 ### Webhook signing secrets
 
