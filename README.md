@@ -29,6 +29,8 @@ pgvector knowledge base, and files bugs into GitHub/Jira.
 - [Common tasks](#common-tasks)
 - [Deployment](#deployment)
 - [Implementation status](#implementation-status)
+- [Interview notes](docs/INTERVIEW.md) — architecture decisions, the hard
+  problems and where each one lives in this repo
 
 ---
 
