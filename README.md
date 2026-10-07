@@ -65,6 +65,12 @@ npm run prisma:migrate
 # 5. Seed roles/permissions (optional but recommended)
 npm run prisma:seed
 
+# 5b. Optional: seed a demo workspace (project, cases, 2 weeks of runs,
+#     bugs, usage) so the dashboard and billing pages have data on a
+#     fresh install. Creates demo@jestbest.dev / DemoPassword123! when
+#     SEED_ADMIN_EMAIL is unset — change it before sharing the instance.
+npm run seed:demo
+
 # 6. Start both dev servers
 ./start-dev.sh
 ```
@@ -483,6 +489,7 @@ npm run prisma:generate     # regenerate the client after schema edits
 npm run prisma:migrate      # create + apply a migration
 npm run prisma:deploy       # apply migrations only (CI/production)
 npm run prisma:seed         # seed roles and permissions
+npm run seed:demo           # seed roles, admin and a demo workspace (idempotent)
 
 npm run dev --prefix web    # frontend
 npm run build --prefix web  # typecheck + production build

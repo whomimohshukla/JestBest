@@ -4,6 +4,7 @@ import { env } from '../config/environment';
 import { SEED_ROLES, ROLE_DESCRIPTIONS } from './roles';
 import { PERMISSION_SEEDS } from './permissions';
 import { passwordService } from '../services/auth/passwordService';
+import { seedDemoData } from './demo';
 import { toSlug } from '../utils/helpers';
 
 const upsertSeeds = async (): Promise<void> => {
@@ -69,9 +70,35 @@ const seedAdmin = async (): Promise<void> => {
   logger.info({ userId: user.id, organizationId: organization.id }, 'seeded default admin');
 };
 
+const wantsDemoData = (): boolean => {
+  if (process.argv.includes('--demo')) {
+    return true;
+  }
+  return ['1', 'true', 'yes'].includes((process.env.SEED_DEMO_DATA ?? '').toLowerCase());
+};
+
 export const seed = async (): Promise<void> => {
   await upsertSeeds();
   await seedAdmin();
+
+  if (!wantsDemoData()) {
+    return;
+  }
+
+  // The demo credentials themselves are only printed here, never written to
+  // logs: see .env.example / README for the account the seed creates.
+  const summary = await seedDemoData();
+  logger.info(
+    {
+      organizationId: summary.organizationId,
+      projectId: summary.projectId,
+      alreadySeeded: summary.alreadySeeded,
+      testCases: summary.testCases,
+      testRuns: summary.testRuns,
+      bugs: summary.bugs,
+    },
+    'demo data seeded'
+  );
 };
 
 if (require.main === module) {
