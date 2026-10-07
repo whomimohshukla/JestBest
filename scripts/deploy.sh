@@ -13,7 +13,7 @@ COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-.env.prod}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
-  echo "ERROR: $ENV_FILE not found. Create it first (see DEPLOYMENT.md)." >&2
+  echo "ERROR: $ENV_FILE not found. Create it first (see the Deployment section of README.md)." >&2
   exit 1
 fi
 
