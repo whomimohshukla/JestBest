@@ -6,7 +6,7 @@ import { ok } from '../../utils/formatters';
 
 export const getWebhook = async (req: Request, res: Response): Promise<void> => {
   const { webhookId } = req.params as { webhookId: string };
-  const webhook = await webhookService.get(webhookId);
+  const webhook = await webhookService.getPublic(webhookId);
   if (req.orgId && webhook.organizationId !== req.orgId) {
     throw new ForbiddenError(Messages.AUTH.FORBIDDEN);
   }

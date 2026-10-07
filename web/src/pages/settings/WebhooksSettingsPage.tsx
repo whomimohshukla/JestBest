@@ -88,6 +88,7 @@ function WebhookDeliveries({ webhookId }: { webhookId: string }) {
 export default function WebhooksSettingsPage() {
   const queryClient = useQueryClient();
   const [showModal, setShowModal] = useState(false);
+  const [generatedSecret, setGeneratedSecret] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState({ url: '', secret: '', eventTypes: [] as WebhookEventType[] });
   const [formErrors, setFormErrors] = useState<{ url?: string; eventTypes?: string }>({});
@@ -100,11 +101,18 @@ export default function WebhooksSettingsPage() {
   const createWebhookMutation = useMutation({
     mutationFn: (data: { url: string; eventTypes: string[]; secret: string }) =>
       webhooksApi.create(data),
-    onSuccess: () => {
+    onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
-      toast.success('Webhook created successfully!');
       setShowModal(false);
       setForm({ url: '', secret: '', eventTypes: [] });
+      // The API returns the secret only in the create response. If the user left
+      // the field blank we generated one for them, so surface it now — refetching
+      // the list returns a redacted value and the secret would be lost forever.
+      if (created?.secret) {
+        setGeneratedSecret(created.secret);
+      } else {
+        toast.success('Webhook created successfully!');
+      }
     },
     onError: (error) => {
       toast.error(getErrorMessage(error));
@@ -302,6 +310,57 @@ export default function WebhooksSettingsPage() {
         </div>
       )}
 
+      {generatedSecret && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="glass w-full max-w-lg rounded-2xl p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="webhook-secret-title"
+          >
+            <h3 id="webhook-secret-title" className="text-lg font-semibold">
+              Copy your signing secret
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              This is the only time it will be shown. Our API redacts it on every
+              subsequent read, so copy it now — use it as the HMAC key when
+              verifying <code className="text-xs">X-JestBest-Signature</code>.
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                readOnly
+                value={generatedSecret}
+                aria-label="Signing secret"
+                className="flex-1 rounded-lg border border-border bg-secondary/50 px-3 py-2 font-mono text-xs"
+                onFocus={(e) => e.currentTarget.select()}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  void navigator.clipboard
+                    ?.writeText(generatedSecret)
+                    .then(() => toast.success('Secret copied'));
+                }}
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-secondary"
+              >
+                Copy
+              </button>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setGeneratedSecret(null)}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+              >
+                I have saved it
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <motion.div
@@ -343,8 +402,16 @@ export default function WebhooksSettingsPage() {
                   onChange={(e) => setForm({ ...form, secret: e.target.value })}
                   className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
                   placeholder="Optional signing secret"
+                  // The API rejects secrets shorter than 16 characters with a
+                  // 400, so enforce it here instead of failing on submit.
+                  minLength={16}
+                  aria-describedby="webhook-secret-hint"
                   disabled={createWebhookMutation.isPending}
                 />
+                <p id="webhook-secret-hint" className="mt-1 text-xs text-muted-foreground">
+                  At least 16 characters. Leave blank and we will generate one and
+                  show it to you once.
+                </p>
               </div>
 
               <div>

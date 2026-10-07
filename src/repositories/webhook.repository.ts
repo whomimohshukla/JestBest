@@ -34,7 +34,9 @@ export const webhookRepository = {
   updateDelivery: (id: string, data: Prisma.WebhookDeliveryUpdateInput) =>
     prisma.webhookDelivery.update({ where: { id }, data }),
 
-  findDelivery: (id: string) => prisma.webhookDelivery.findUnique({ where: { id } }),
+  /** Scoped to the webhook so a delivery id from another tenant cannot resolve. */
+  findDelivery: (webhookId: string, deliveryId: string) =>
+    prisma.webhookDelivery.findFirst({ where: { id: deliveryId, webhookId } }),
 
   listDeliveries: (webhookId: string, skip = 0, take = 20) =>
     prisma.webhookDelivery.findMany({

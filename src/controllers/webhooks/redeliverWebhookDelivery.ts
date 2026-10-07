@@ -13,6 +13,6 @@ export const redeliverWebhookDelivery = async (req: Request, res: Response): Pro
   if (webhook.organizationId !== req.orgId) {
     throw new ForbiddenError(Messages.AUTH.FORBIDDEN);
   }
-  const delivery = await webhookService.redeliver(deliveryId);
+  const delivery = await webhookService.redeliver(deliveryId, webhookId);
   res.status(200).json(ok(delivery, { message: Messages.WEBHOOK.DELIVERY_REDELIVERED }));
 };

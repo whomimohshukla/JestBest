@@ -1,10 +1,11 @@
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, timingSafeEqual, randomBytes } from 'crypto';
 import { webhookRepository } from '../../repositories/webhook.repository';
 import { webhookQueue } from '../../queues/webhookQueue';
 import { NotFoundError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
 import { pagination } from '../../utils/formatters';
 import { logger } from '../../config/logger';
+import { safeFetch, assertSafeUrl } from '../../utils/safeFetch';
 import type { Prisma, Webhook, WebhookDelivery, WebhookEventType } from '@prisma/client';
 import type { ListResponse } from '../../types/api.types';
 import type { CreateWebhookInput } from '../../validators/webhook.validator';
@@ -16,9 +17,33 @@ export interface WebhookPayload {
   data: unknown;
 }
 
+/**
+ * Webhook responses to expose. `secret` is the HMAC key used to sign outbound
+ * payloads; returning it let anyone with read access forge webhooks that the
+ * customer's own systems would accept as genuine. It is shown once, at
+ * creation time, and never again.
+ */
+export type WebhookPublic = Omit<Webhook, 'secret'>;
+
+const toPublic = (webhook: Webhook): WebhookPublic => {
+  const { secret: _secret, ...rest } = webhook;
+  return rest;
+};
+
+/** Strip URLs out of a delivery error before persisting it. */
+const sanitizeDeliveryError = (message: string): string =>
+  message.replace(/https?:\/\/\S+/gi, '[url]').slice(0, 500);
+
 export const webhookService = {
   async create(organizationId: string, params: CreateWebhookInput): Promise<Webhook> {
-    const secret = params.secret ?? createHmac('sha256', organizationId).digest('hex').slice(0, 32);
+    // Reject an internal target at save time so the user gets immediate
+    // feedback, rather than discovering it as a permanent delivery failure.
+    await assertSafeUrl(params.url);
+    // This was `createHmac('sha256', organizationId)`, which is not a secret at
+    // all: the organization id appears in API responses and URLs, so anyone who
+    // knew it could recompute every webhook signature and forge deliveries that
+    // the customer's own systems would accept. Derive from a CSPRNG instead.
+    const secret = params.secret ?? randomBytes(32).toString('hex');
     return webhookRepository.create({
       organizationId,
       projectId: params.projectId,
@@ -36,9 +61,20 @@ export const webhookService = {
     return webhook;
   },
 
-  async update(webhookId: string, params: Prisma.WebhookUpdateInput): Promise<Webhook> {
+  /** Same lookup as `get`, but with the signing secret stripped. */
+  async getPublic(webhookId: string): Promise<WebhookPublic> {
+    return toPublic(await webhookService.get(webhookId));
+  },
+
+  async update(webhookId: string, params: Prisma.WebhookUpdateInput): Promise<WebhookPublic> {
     await webhookService.get(webhookId);
-    return webhookRepository.update(webhookId, params);
+    // Validate a changed URL before it is stored, so an internal target is
+    // rejected up front rather than only at delivery time.
+    const nextUrl = typeof params.url === 'string' ? params.url : undefined;
+    if (nextUrl) {
+      await assertSafeUrl(nextUrl);
+    }
+    return toPublic(await webhookRepository.update(webhookId, params));
   },
 
   async hardDelete(webhookId: string): Promise<void> {
@@ -46,8 +82,8 @@ export const webhookService = {
     await webhookRepository.hardDelete(webhookId);
   },
 
-  async list(organizationId: string, projectId?: string | null): Promise<Webhook[]> {
-    return webhookRepository.list(organizationId, projectId);
+  async list(organizationId: string, projectId?: string | null): Promise<WebhookPublic[]> {
+    return (await webhookRepository.list(organizationId, projectId)).map(toPublic);
   },
 
   sign(payload: string, secret: string): string {
@@ -119,8 +155,13 @@ export const webhookService = {
     return pagination(items, total, { page, pageSize });
   },
 
-  async redeliver(deliveryId: string): Promise<{ queued: boolean }> {
-    const delivery = await webhookRepository.findDelivery(deliveryId);
+  async redeliver(deliveryId: string, webhookId: string): Promise<{ queued: boolean }> {
+    // The delivery is looked up *through* the webhook, which the caller has
+    // already had authorized against their organization. Resolving it by id
+    // alone let any caller force a re-delivery of another tenant's event —
+    // which also turned that tenant's webhook URL into a target the attacker
+    // could trigger.
+    const delivery = await webhookRepository.findDelivery(webhookId, deliveryId);
     if (!delivery) {
       throw new NotFoundError(Messages.WEBHOOK.DELIVERY_NOT_FOUND);
     }
@@ -155,7 +196,11 @@ export const webhookService = {
     const body = JSON.stringify(payload);
     const signature = webhookService.sign(body, webhook.secret);
     try {
-      const response = await fetch(webhook.url, {
+      // Guarded: the URL is attacker-chosen, so an unguarded fetch turns this
+      // into an SSRF primitive. `safeFetch` rejects non-HTTP schemes, resolves
+      // DNS and refuses private/loopback/link-local/metadata targets, refuses
+      // embedded credentials, and does not follow redirects.
+      const response = await safeFetch(webhook.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -164,11 +209,14 @@ export const webhookService = {
           'User-Agent': 'JestBest-Webhook/1.0',
         },
         body,
+        timeoutMs: 10000,
       });
       if (deliveryId) {
         await webhookRepository.updateDelivery(deliveryId, {
           responseStatus: response.status,
-          responseBody: (await response.text().catch(() => '')).slice(0, 2000),
+          // The response body is not stored. It was readable through
+          // GET /webhooks/:id/deliveries, which made this an exfiltration
+          // channel for anything the webhook URL could reach.
           succeededAt: response.ok ? new Date() : undefined,
           failedAt: response.ok ? undefined : new Date(),
         });
@@ -186,7 +234,9 @@ export const webhookService = {
       logger.warn({ webhookId: webhook.id, err: error }, 'webhook delivery failed');
       if (deliveryId) {
         await webhookRepository.updateDelivery(deliveryId, {
-          responseBody: (error as Error).message.slice(0, 2000),
+          // Error messages can embed the URL that was dialled; keep them as a
+          // diagnostic but never the response body of a blocked or failed call.
+          responseBody: sanitizeDeliveryError((error as Error).message),
           failedAt: new Date(),
         });
       }
