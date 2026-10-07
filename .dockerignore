@@ -10,3 +10,6 @@ __tests__
 jest.config.js
 jest.setup.js
 README.md
+web/node_modules
+web/dist
+.github

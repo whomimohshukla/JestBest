@@ -1,0 +1,121 @@
+# Production topology: one machine, four containers, one public entry point.
+#
+#   internet → :80 web (nginx, TLS usually terminated at a load balancer or
+#                      certbot on the host) → /api proxy → api:4000
+#                                           → static SPA (React)
+#
+# postgres and redis are internal-only: they publish no ports, so a port scan
+# of the host cannot reach the database. The api service is internal too —
+# only nginx can reach it. Configure secrets in `.env.prod` (never committed).
+#
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: jestbest-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env.prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:-jestbest}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB:-jestbest}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  redis:
+    image: redis:7-alpine
+    container_name: jestbest-redis
+    restart: unless-stopped
+    # appendonly keeps refresh tokens and OAuth state across restarts
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  api:
+    # Tagged so CI can push here and the host only has to pull, not rebuild.
+    image: ${API_IMAGE:-jestbest-api:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # Set to 1 in .env.prod to bake Chromium into the image for browser runs.
+      args:
+        INSTALL_BROWSERS: ${INSTALL_BROWSERS:-0}
+    container_name: jestbest-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      # nginx proxies /api on the public origin, so that origin must be trusted.
+      APP_ORIGIN: ${APP_ORIGIN:?set in .env.prod}
+      FRONTEND_ORIGIN: ${APP_ORIGIN:?set in .env.prod}
+      API_ORIGIN: ${APP_ORIGIN:?set in .env.prod}
+      CORS_ORIGINS: ${APP_ORIGIN:?set in .env.prod}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-jestbest}?schema=public
+      REDIS_URL: redis://redis:6379
+      REDIS_KEY_PREFIX: 'jestbest:'
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set in .env.prod}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set in .env.prod}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?set in .env.prod}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-log}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      GITHUB_OAUTH_CALLBACK_URL: ${APP_ORIGIN}/api/v1/auth/oauth/github/callback
+    # Not published on the host: only nginx reaches it.
+    expose: ['4000']
+    # Migrations run before boot so the schema matches the image that is about
+    # to serve traffic. `restart: unless-stopped` retries on failure, so a DB
+    # that is still starting resolves itself.
+    command: sh -c "npx prisma migrate deploy && node dist/server.js"
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:4000/api/v1/health/ready >/dev/null || exit 1']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [internal, edge]
+
+  web:
+    image: ${WEB_IMAGE:-jestbest-web:latest}
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        # Same-origin /api is what makes the nginx proxy work; do not point this
+        # at a full http://host/api/v1 URL in production.
+        VITE_API_URL: ${VITE_API_URL:-/api/v1}
+    container_name: jestbest-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - '80:80'
+    networks: [edge]
+
+networks:
+  # edge  = reachable from the published port on `web`
+  # internal = reachable only between containers, no host port
+  edge:
+  internal:
+
+volumes:
+  pgdata:
+  redisdata:
