@@ -6,7 +6,8 @@ export interface JwtPayload {
   sub: string;
   orgId: string;
   roles: RoleName[];
-  type: 'access' | 'refresh';
+  /** `oauth-exchange` tokens are single-use hand-offs, never sessions. */
+  type: 'access' | 'refresh' | 'oauth-exchange';
   jti?: string;
   exp?: number;
   iat?: number;
@@ -68,6 +69,12 @@ export interface TwoFactorAuthResult {
   twoFactorToken: string;
   user: PublicUser;
   organization: { id: string; name: string; slug: string; requireTwoFactor: boolean };
+  /**
+   * The organization mandates 2FA and this account has not enrolled yet. The
+   * enrolment material was emailed to the verified address rather than returned
+   * here, so the client must prompt the user to check their inbox.
+   */
+  setupRequired?: boolean;
   setup?: TwoFactorSetupBundle;
 }
 

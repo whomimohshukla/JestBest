@@ -1,6 +1,7 @@
 import { randomUUID, randomBytes, createHash } from 'crypto';
 import { signToken, verifyToken } from '../../utils/jwt';
 import { getRedis } from '../../config/redis';
+import { prisma } from '../../config/database';
 import { env } from '../../config/environment';
 import { UnauthorizedError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
@@ -12,6 +13,11 @@ const USER_TOKENS_PREFIX = 'auth:user-tokens:';
 const BLACKLIST_PREFIX = 'auth:blacklist:';
 const RESET_PREFIX = 'auth:reset:';
 const PASSWORD_VERSION_PREFIX = 'auth:password-version:';
+/** Spent refresh-token jtis, kept briefly so a replay can be detected. */
+const CONSUMED_PREFIX = 'auth:refresh-consumed:';
+/** Pending OAuth hand-offs between the provider redirect and the SPA. */
+const OAUTH_EXCHANGE_PREFIX = 'auth:oauth-exchange:';
+const OAUTH_EXCHANGE_TTL_SECONDS = 5 * 60;
 
 const toNumber = (value: unknown): number => {
   const n = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
@@ -41,8 +47,7 @@ const expiryToSeconds = (value: string): number => {
   return Math.max(60, n * multiplier);
 };
 
-const passwordResetTtlSeconds = (): number =>
-  expiryToSeconds(env.PASSWORD_RESET_EXPIRES_IN);
+const passwordResetTtlSeconds = (): number => expiryToSeconds(env.PASSWORD_RESET_EXPIRES_IN);
 
 const recordUserToken = async (userId: string, jti: string, ttl: number): Promise<void> => {
   const redis = getRedis();
@@ -116,8 +121,20 @@ export const tokenService = {
     }
 
     const redis = getRedis();
-    const stored = await redis.get(`${REFRESH_PREFIX}${payload.jti}`);
+    // GETDEL is atomic: a plain GET followed by DEL let two concurrent requests
+    // carrying the same refresh token both pass the check and both receive a
+    // fresh pair, silently forking one session into two live ones.
+    const stored = await redis.getdel(`${REFRESH_PREFIX}${payload.jti}`);
     if (!stored) {
+      // A jti that is absent but recorded as already consumed means this token
+      // was replayed after a successful rotation — i.e. it was stolen. Retire
+      // every session the user has so the thief and the victim are separated
+      // and both are forced to re-authenticate.
+      const consumedBy = await redis.get(`${CONSUMED_PREFIX}${payload.jti}`);
+      if (consumedBy && consumedBy === payload.sub) {
+        await tokenService.revokeAllForUser(String(payload.sub));
+        await redis.del(`${CONSUMED_PREFIX}${payload.jti}`);
+      }
       throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
     }
 
@@ -126,15 +143,73 @@ export const tokenService = {
       throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
     }
 
-    await redis.del(`${REFRESH_PREFIX}${payload.jti}`);
     await forgetUserToken(data.userId, payload.jti);
+    // Remember that this jti was spent, for reuse detection above.
+    await redis.set(`${CONSUMED_PREFIX}${payload.jti}`, String(payload.sub), 'EX', remainingTtl(payload.exp));
+
+    // Re-read the role from the live membership instead of propagating the
+    // `roles` claim. The claim is a snapshot from whenever the token was minted
+    // and each refresh re-armed its TTL, so forwarding it let a demoted member
+    // refresh indefinitely and keep their old role forever.
+    const membership = await prisma.membership.findFirst({
+      where: { userId: data.userId, organizationId: data.orgId, deletedAt: null },
+      select: { role: true },
+    });
+    if (!membership) {
+      // Removed from the organization since the token was issued.
+      throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+
     const tokens = await tokenService.issue({
       userId: data.userId,
       orgId: data.orgId,
-      roles: payload.roles,
+      roles: [membership.role],
     });
 
     return { tokens };
+  },
+
+  /**
+   * Mint a short-lived, single-use token that stands in for a provider's OAuth
+   * authorization code on the trip back to the SPA. The code has already been
+   * exchanged by the time the browser is redirected, so the SPA cannot present
+   * it again — it presents this instead and receives the session at
+   * `POST /auth/oauth/exchange`.
+   */
+  issueOAuthExchangeToken: async (options: IssueOptions): Promise<string> => {
+    const jti = randomUUID();
+    const token = signToken({ sub: '', orgId: '', roles: [], type: 'oauth-exchange', jti }, 'access');
+    await getRedis().set(
+      `${OAUTH_EXCHANGE_PREFIX}${jti}`,
+      JSON.stringify(options),
+      'EX',
+      OAUTH_EXCHANGE_TTL_SECONDS
+    );
+    return token;
+  },
+
+  /**
+   * Redeem an exchange token for a real session. GETDEL is atomic, so the token
+   * works exactly once and a leaked callback URL cannot be replayed.
+   */
+  redeemOAuthExchangeToken: async (token: string): Promise<{ tokens: TokenPair; userId: string }> => {
+    let payload: JwtPayload;
+    try {
+      payload = verifyToken(token, 'access');
+    } catch {
+      throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+    if (payload.type !== 'oauth-exchange' || !payload.jti) {
+      throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+
+    const raw = await getRedis().getdel(`${OAUTH_EXCHANGE_PREFIX}${payload.jti}`);
+    if (!raw) {
+      throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+
+    const options = JSON.parse(raw) as IssueOptions;
+    return { tokens: await tokenService.issue(options), userId: options.userId };
   },
 
   revokeRefresh: async (refreshToken: string): Promise<void> => {

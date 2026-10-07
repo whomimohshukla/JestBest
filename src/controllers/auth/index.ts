@@ -9,3 +9,4 @@ export { verifyTwoFactor } from './verifyTwoFactor';
 export { resendVerification } from './resendVerification';
 export { oauthCallback } from './oauthCallback';
 export { oauthAuthorize } from './oauthAuthorize';
+export { oauthExchange } from './oauthExchange';

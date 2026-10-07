@@ -10,7 +10,13 @@ export const authApi = {
     apiPost<AuthResult>('/auth/register', data),
   refreshToken: (refreshToken: string) =>
     apiPost<{ tokens: { accessToken: string; refreshToken: string } }>('/auth/refresh-token', { refreshToken }),
-  logout: () => apiPost<{ message: string }>('/auth/logout', {}),
+  logout: () =>
+    apiPost<{ message: string }>('/auth/logout', {
+      // The server revokes the refresh token it is given. Sending an empty body
+      // left it valid in Redis for the rest of its 7-day life, so signing out
+      // did not end the server-side session.
+      refreshToken: localStorage.getItem('refreshToken') ?? undefined,
+    }),
   verifyEmail: (token: string) =>
     apiPost<{ message: string }>('/auth/verify-email', { token }),
   resendVerification: (email: string) =>
@@ -21,8 +27,13 @@ export const authApi = {
     apiPost<{ message: string }>('/auth/reset-password', { token, password }),
   oauthAuthorize: (provider: string) =>
     apiGet<{ url: string; state: string }>(`/auth/oauth/${provider}/authorize`),
-  oauthCallback: (provider: string, code: string, state?: string) =>
-    apiGet<AuthResult>(`/auth/oauth/${provider}/callback`, { code, state }),
+  /**
+   * Redeem the single-use token the OAuth callback redirected with. The
+   * provider `code` is single-use and has already been spent by the server, so
+   * the SPA exchanges this instead of re-sending the code.
+   */
+  oauthExchange: (exchangeToken: string) =>
+    apiPost<AuthResult>('/auth/oauth/exchange', { exchangeToken }),
   getMe: () => apiGet<User>('/users/me'),
 };
 

@@ -15,8 +15,12 @@ export default function OAuthCallbackPage() {
   const setAuth = useAuthStore((state) => state.setAuth);
 
   const provider = searchParams.get('provider');
-  const code = searchParams.get('code');
-  const state = searchParams.get('state');
+  // The API's callback route already exchanged the provider code before
+  // redirecting here, so this page receives a single-use exchange token.
+  const exchangeToken = searchParams.get('exchange');
+  // Set when the API rejected the callback (missing/unknown state, provider
+  // error). The redirect carries a human-readable `message` too.
+  const failure = searchParams.get('message');
 
   const [errorMessage, setErrorMessage] = useState('');
   const hasRun = useRef(false);
@@ -25,13 +29,15 @@ export default function OAuthCallbackPage() {
     if (hasRun.current) return;
     hasRun.current = true;
 
-    if (!provider || !code) {
+    if (!provider || !exchangeToken) {
       // Cancelled at the provider, not a crash. This fires on the login page
       // after redirect, so it is a warning the user dismisses, not an error.
       toast.warning(
-        provider
-          ? `${provider} sign-in was cancelled or came back without a code. Nothing was changed.`
-          : 'Sign-in was cancelled before it started. Nothing was changed.'
+        failure
+          ? `${provider ?? 'Sign-in'} failed: ${failure}`
+          : provider
+            ? `${provider} sign-in was cancelled or came back without a code. Nothing was changed.`
+            : 'Sign-in was cancelled before it started. Nothing was changed.'
       );
       navigate('/auth/login');
       return;
@@ -39,7 +45,7 @@ export default function OAuthCallbackPage() {
 
     const handleCallback = async () => {
       try {
-        const result = await authApi.oauthCallback(provider, code, state ?? undefined);
+        const result = await authApi.oauthExchange(exchangeToken);
         setAuth(result);
         toast.success('Welcome to JestBest');
         navigate('/dashboard');
@@ -49,7 +55,7 @@ export default function OAuthCallbackPage() {
     };
 
     handleCallback();
-  }, [provider, code, state, navigate, setAuth]);
+  }, [provider, exchangeToken, failure, navigate, setAuth]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-background via-background to-red-600/5 p-4 relative overflow-hidden">
@@ -84,7 +90,7 @@ export default function OAuthCallbackPage() {
           transition={{ delay: 0.2 }}
           className="glass p-8 rounded-2xl backdrop-blur-xl"
         >
-          {!provider || !code ? (
+          {!provider || !exchangeToken ? (
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-5 h-5 animate-spin text-red-500" />
               Redirecting…

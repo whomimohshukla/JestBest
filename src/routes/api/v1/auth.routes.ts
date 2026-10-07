@@ -11,6 +11,7 @@ import {
   resendVerification as resendVerificationController,
   oauthCallback,
   oauthAuthorize,
+  oauthExchange,
 } from '../../../controllers/auth';
 import {
   registerSchema,
@@ -20,6 +21,7 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
   verifyTwoFactorSchema,
+  oauthExchangeSchema,
 } from '../../../validators';
 import { validate } from '../../../middleware';
 import { authRateLimiter, authenticate } from '../../../middleware';
@@ -50,5 +52,6 @@ router.post('/reset-password', authRateLimiter, validate(resetPasswordSchema), r
 // OAuth routes
 router.get('/oauth/:provider/authorize', authRateLimiter, asyncHandler(oauthAuthorize));
 router.get('/oauth/:provider/callback', authRateLimiter, asyncHandler(oauthCallback));
+router.post('/oauth/exchange', authRateLimiter, validate(oauthExchangeSchema), asyncHandler(oauthExchange));
 
 export default router;

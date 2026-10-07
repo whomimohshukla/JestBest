@@ -12,6 +12,12 @@ const envSchema = z.object({
   API_PREFIX: z.string().default('/api/v1'),
   APP_ORIGIN: z.string().default('http://localhost:5173'),
   FRONTEND_ORIGIN: z.string().default('http://localhost:5173'),
+  /**
+   * Public base URL of this API. Needed for the OAuth redirect URI, which must
+   * point back at the server that performs the code exchange — pointing it at
+   * the SPA origin makes GitHub redirect somewhere that cannot complete sign-in.
+   */
+  API_ORIGIN: z.string().default('http://localhost:4000'),
 
   DATABASE_URL: z.string().min(1),
   REDIS_URL: z.string().default('redis://localhost:6379'),
