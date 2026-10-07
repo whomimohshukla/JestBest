@@ -18,8 +18,8 @@ import {
   TableRow,
   TableHead,
   TableCell,
-  HowToBox } from '../../components/ui';
-import { Plus, Search, Bug, Trash2, Loader2, RefreshCw } from 'lucide-react';
+  HowToBox , ButtonLoader } from '../../components/ui';
+import { Plus, Search, Bug, Trash2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Bug as BugType, BugSeverity, BugPriority } from '../../types';
 
@@ -367,7 +367,7 @@ export default function BugsPage() {
                 >
                   {createBugMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Creating...
                     </>
                   ) : (

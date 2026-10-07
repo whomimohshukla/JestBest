@@ -4,9 +4,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
-import { PageLoader, FieldError } from '../../components/ui';
+import { PageLoader, FieldError , ButtonLoader } from '../../components/ui';
 import { WorkspaceSwitcher } from '../../components/WorkspaceSwitcher';
-import { Building2, Loader2, RefreshCw } from 'lucide-react';
+import { Building2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function OrganizationSettingsPage() {
@@ -151,7 +151,7 @@ export default function OrganizationSettingsPage() {
             >
               {updateOrgMutation.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <ButtonLoader />
                   Saving...
                 </>
               ) : (

@@ -1,10 +1,11 @@
+import { Spinner } from '../../components/ui';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { Lock, ArrowRight, AlertCircle, Loader2, CheckCircle2, KeyRound } from 'lucide-react';
+import { Lock, ArrowRight, AlertCircle, CheckCircle2, KeyRound } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 
 export default function ResetPasswordPage() {
@@ -208,7 +209,7 @@ setIsLoading(true);
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Spinner size="md" />
                   Resetting...
                 </>
               ) : (

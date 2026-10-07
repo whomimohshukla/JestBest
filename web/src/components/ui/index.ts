@@ -3,7 +3,7 @@ export { Input, type InputProps } from './input';
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent } from './card';
 export { Badge, badgeVariants, type BadgeProps } from './badge';
 export { Spinner, PageLoader, ButtonLoader } from './spinner';
-export { Skeleton } from './skeleton';
+export { Skeleton, SkeletonRows, SkeletonCard } from './skeleton';
 export { EmptyState, StatCard, PageHeader } from './empty-state';
 export { ErrorState, type ErrorStateKind } from './error-state';
 export { OfflineBanner } from './OfflineBanner';

@@ -7,7 +7,6 @@ import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
   Plus,
-  Loader2,
   PlaySquare,
   Trash2,
   FolderKanban,
@@ -20,7 +19,7 @@ import {
   MinusCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { EmptyState, Select, PageLoader } from '../../components/ui';
+import { EmptyState, Select, PageLoader , ButtonLoader } from '../../components/ui';
 
 export default function TestSuitesPage() {
   const navigate = useNavigate();
@@ -264,7 +263,7 @@ export default function TestSuitesPage() {
                     className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-600/90 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {runSuiteMutation.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                     ) : (
                       <PlaySquare className="w-4 h-4" />
                     )}
@@ -378,7 +377,7 @@ export default function TestSuitesPage() {
                       className="px-4 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
                     >
                       {addTestCaseMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <ButtonLoader />
                       ) : (
                         <PlusCircle className="w-4 h-4" />
                       )}
@@ -463,7 +462,7 @@ export default function TestSuitesPage() {
                 >
                   {createSuiteMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Creating...
                     </>
                   ) : (

@@ -15,14 +15,13 @@ import {
   PriorityBadge,
   InfoRow,
   Button,
-} from '../../components/ui';
+  ButtonLoader } from '../../components/ui';
 import {
   ArrowLeft,
   Trash2,
   MessageSquare,
   User,
   Bug,
-  Loader2,
   Calendar,
   RefreshCw,
   GitBranch,
@@ -220,7 +219,7 @@ export default function BugDetailPage() {
               title="Report this bug as a GitHub issue in your connected repository"
             >
               {raiseGithubMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <ButtonLoader />
               ) : (
                 <GitBranch className="w-4 h-4" />
               )}
@@ -233,7 +232,7 @@ export default function BugDetailPage() {
             className="inline-flex items-center gap-2 px-4 py-2.5 bg-destructive hover:bg-destructive/90 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             {deleteMutation.isPending ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <ButtonLoader />
             ) : (
               <Trash2 className="w-4 h-4" />
             )}
@@ -321,7 +320,7 @@ export default function BugDetailPage() {
                   type="submit"
                   disabled={addCommentMutation.isPending || !comment.trim()}
                 >
-                  {addCommentMutation.isPending && <Loader2 className="animate-spin" />}
+                  {addCommentMutation.isPending && <ButtonLoader />}
                   Add Comment
                 </Button>
               </form>

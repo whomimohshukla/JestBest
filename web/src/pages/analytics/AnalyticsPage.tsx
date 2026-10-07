@@ -20,7 +20,7 @@ import {
 import { analyticsApi } from '../../api';
 import Layout from '../../components/Layout';
 import { FlakyTestsPanel } from '../../components/FlakyTestsList';
-import { PageHeader, StatCard, PageLoader, EmptyState, Badge } from '../../components/ui';
+import { PageHeader, StatCard, Skeleton, SkeletonCard, EmptyState, Badge } from '../../components/ui';
 import type { DashboardAnalytics, TestMetricsResponse, FlakyTest } from '../../types';
 
 export default function AnalyticsPage() {
@@ -66,7 +66,32 @@ export default function AnalyticsPage() {
       />
 
       {isLoading ? (
-        <PageLoader label="Loading analytics..." />
+        <div className="space-y-6" aria-busy="true" aria-label="Loading analytics">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className="rounded-xl border border-border/60 bg-card/50 p-5">
+                <Skeleton className="mb-3 h-4 w-20" />
+                <Skeleton className="h-8 w-14" />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <div className="rounded-xl border border-border/60 bg-card/50 p-6">
+            <Skeleton className="mb-6 h-5 w-28" />
+            <div className="flex h-56 items-end gap-2" aria-hidden="true">
+              {Array.from({ length: 14 }, (_, i) => (
+                <Skeleton
+                  key={i}
+                  className="flex-1 rounded-t-md"
+                  style={{ height: `${30 + ((i * 19) % 55)}%` }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
       ) : isError ? (
         <div className="glass rounded-xl p-8 text-center">
           <p className="text-red-500 font-medium mb-4">Failed to load analytics.</p>

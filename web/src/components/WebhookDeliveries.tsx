@@ -1,8 +1,9 @@
+import { Spinner } from './ui';
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhooksApi } from '../api';
 import { getErrorMessage } from '../api/client';
-import { Loader2, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { WebhookDelivery } from '../types';
 
@@ -93,7 +94,7 @@ export function WebhookDeliveries({ webhookId }: { webhookId: string }) {
                       >
                         {redeliverMutation.isPending &&
                         redeliverMutation.variables === d.id ? (
-                          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                          <Spinner size="xs" />
                         ) : (
                           <RefreshCw className="h-3 w-3" aria-hidden="true" />
                         )}

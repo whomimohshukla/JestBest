@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi, applicationsApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
-import { PageLoader, Select, EmptyState, Badge, HowToBox } from '../../components/ui';
+import { PageLoader, Select, EmptyState, Badge, HowToBox , ButtonLoader } from '../../components/ui';
 import {
   Plus,
   Globe,
@@ -13,7 +13,6 @@ import {
   Trash2,
   ScanSearch,
   FlaskConical,
-  Loader2,
   Layers,
   Calendar,
 } from 'lucide-react';
@@ -225,7 +224,7 @@ export default function ApplicationsPage() {
               disabled={isFetching}
               className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
             >
-              {isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {isFetching ? <ButtonLoader /> : null}
               Retry
             </button>
           </div>
@@ -309,7 +308,7 @@ export default function ApplicationsPage() {
                     className="flex-1 px-3 py-2 bg-red-600 hover:bg-red-600/90 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {scanMutation.isPending && scanningAppId === app.id ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                     ) : (
                       <ScanSearch className="w-4 h-4" />
                     )}
@@ -410,7 +409,7 @@ export default function ApplicationsPage() {
                 >
                   {createMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Adding...
                     </>
                   ) : (

@@ -6,7 +6,6 @@ import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
   Plus,
-  Loader2,
   RefreshCw,
   Zap,
   Bot,
@@ -20,7 +19,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { PageLoader, EmptyState, Select, HowToBox } from '../../components/ui';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../../components/ui';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell , ButtonLoader, Spinner } from '../../components/ui';
 import type { AgentRun } from '../../types';
 import { hasActiveItems, pollWhileActive } from '../../lib/polling';
 import type { LucideIcon } from 'lucide-react';
@@ -349,7 +348,7 @@ export default function AgentsPage() {
                 ) : selectedRun?.status === 'FAILED' || selectedRun?.status === 'CANCELLED' ? (
                   <XCircle className="w-5 h-5 text-red-500" />
                 ) : (
-                  <Loader2 className="w-5 h-5 animate-spin text-red-500" />
+                  <Spinner size="md" className="text-red-500" />
                 )}
                 <button
                   onClick={() => setSelectedRunId(null)}
@@ -490,7 +489,7 @@ export default function AgentsPage() {
                 >
                   {triggerMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Triggering...
                     </>
                   ) : (

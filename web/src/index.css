@@ -183,3 +183,38 @@
 .animate-pulse-slow {
   animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Linear, slightly-faster rotation: the Tailwind default (1s, linear-eased
+   differently) reads as sluggish next to a crisp skeleton. 0.7s is still calm
+   but feels deliberate through the whole arc. */
+@keyframes loader-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-loader-spin {
+  animation: loader-spin 0.7s linear infinite;
+}
+
+/* Shimmer sweep for skeleton blocks: a soft highlight travels left-to-right
+   and the gradient restarts because background-size doubles the span. */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    100deg,
+    hsl(var(--secondary)) 8%,
+    hsl(var(--secondary) / 0.35) 40%,
+    hsl(var(--secondary)) 72%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}

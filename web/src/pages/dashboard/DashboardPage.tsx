@@ -16,7 +16,7 @@ import {
   RefreshCcw,
 } from 'lucide-react';
 import { analyticsApi, projectsApi } from '../../api';
-import { PageHeader, StatCard, PageLoader, EmptyState, RunStatusBadge, Badge } from '../../components/ui';
+import { PageHeader, StatCard, Skeleton, SkeletonCard, SkeletonRows, EmptyState, RunStatusBadge, Badge } from '../../components/ui';
 import toast from 'react-hot-toast';
 import { getErrorMessage } from '../../api/client';
 import type { Project, TestRun, DashboardAnalytics } from '../../types';
@@ -143,7 +143,24 @@ export default function DashboardPage() {
       </div>
 
       {isLoading ? (
-        <PageLoader label="Loading dashboard…" />
+        <div className="space-y-6" aria-busy="true" aria-label="Loading dashboard">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className="rounded-xl border border-border/60 bg-card/50 p-5">
+                <Skeleton className="mb-3 h-4 w-24" />
+                <Skeleton className="h-8 w-16" />
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <div className="rounded-xl border border-border/60 bg-card/50 p-6">
+            <Skeleton className="mb-4 h-5 w-32" />
+            <SkeletonRows rows={4} />
+          </div>
+        </div>
       ) : isError ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border bg-card/50 px-6 py-20 text-center">
           <AlertTriangle className="h-10 w-10 text-amber-500" />

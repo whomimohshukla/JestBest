@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Bell, Mail, Save, MessagesSquare, Loader2, RefreshCw } from 'lucide-react';
+import { Bell, Mail, Save, MessagesSquare, RefreshCw } from 'lucide-react';
 import { notificationsApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
-import { PageLoader } from '../../components/ui';
+import { PageLoader , ButtonLoader } from '../../components/ui';
 import toast from 'react-hot-toast';
 
 const CHANNEL_OPTIONS = [
@@ -149,7 +149,7 @@ export default function NotificationsSettingsPage() {
         className="flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-600/90 text-white rounded-lg text-sm font-medium disabled:opacity-50"
       >
         {saveMutation.isPending ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
+          <ButtonLoader />
         ) : (
           <Save className="w-4 h-4" />
         )}

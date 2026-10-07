@@ -4,12 +4,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '../../api';
 import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
-import { PageLoader, Select, FieldError } from '../../components/ui';
+import { PageLoader, Select, FieldError , ButtonLoader } from '../../components/ui';
 import { useAuthStore } from '../../store/authStore';
 import { useNavigate } from 'react-router-dom';
 import {
   KeyRound,
-  Loader2,
   RefreshCw,
   User,
   ShieldCheck,
@@ -280,7 +279,7 @@ export default function ProfileSettingsPage() {
           >
             {resendVerificationMutation.isPending ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Sending...
+                <ButtonLoader /> Sending...
               </>
             ) : (
               <>
@@ -312,7 +311,7 @@ export default function ProfileSettingsPage() {
           >
             {reactivateMutation.isPending ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" /> Reactivating...
+                <ButtonLoader /> Reactivating...
               </>
             ) : (
               <>Reactivate account</>
@@ -438,7 +437,7 @@ export default function ProfileSettingsPage() {
             >
               {updateProfileMutation.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <ButtonLoader />
                   Saving...
                 </>
               ) : (
@@ -513,7 +512,7 @@ export default function ProfileSettingsPage() {
             >
               {disableTwoFactorMutation.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Disabling...
+                  <ButtonLoader /> Disabling...
                 </>
               ) : (
                 <>
@@ -559,7 +558,7 @@ export default function ProfileSettingsPage() {
               >
                 {enableTwoFactorMutation.isPending ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Enabling...
+                    <ButtonLoader /> Enabling...
                   </>
                 ) : (
                   <>
@@ -598,7 +597,7 @@ export default function ProfileSettingsPage() {
             >
               {setupTwoFactorMutation.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Preparing...
+                  <ButtonLoader /> Preparing...
                 </>
               ) : (
                 <>
@@ -757,7 +756,7 @@ export default function ProfileSettingsPage() {
             >
               {changePasswordMutation.isPending ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <ButtonLoader />
                   Updating...
                 </>
               ) : (
@@ -805,7 +804,7 @@ export default function ProfileSettingsPage() {
               >
                 {suspendMutation.isPending ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Suspending...
+                    <ButtonLoader /> Suspending...
                   </>
                 ) : (
                   'Suspend account'
@@ -853,7 +852,7 @@ export default function ProfileSettingsPage() {
               >
                 {deleteMutation.isPending ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" /> Deleting...
+                    <ButtonLoader /> Deleting...
                   </>
                 ) : (
                   'Delete permanently'

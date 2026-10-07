@@ -5,7 +5,6 @@ import { integrationsApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
-  Loader2,
   RefreshCw,
   Zap,
   GitBranch,
@@ -17,7 +16,7 @@ import {
   PlugZap,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { PageLoader, Badge } from '../../components/ui';
+import { PageLoader, Badge , ButtonLoader } from '../../components/ui';
 import type { LucideIcon } from 'lucide-react';
 
 interface IntegrationField {
@@ -322,7 +321,7 @@ export default function IntegrationsPage() {
                 >
                   {connectMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Connecting...
                     </>
                   ) : (

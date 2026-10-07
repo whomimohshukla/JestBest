@@ -5,9 +5,9 @@ import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { Logo } from '../../components/Logo';
-import { PageLoader } from '../../components/ui';
+import { PageLoader , Spinner } from '../../components/ui';
 
 export default function OAuthCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -92,7 +92,7 @@ export default function OAuthCallbackPage() {
         >
           {!provider || !exchangeToken ? (
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin text-red-500" />
+              <Spinner size="md" className="text-red-500" />
               Redirecting…
             </div>
           ) : errorMessage ? (

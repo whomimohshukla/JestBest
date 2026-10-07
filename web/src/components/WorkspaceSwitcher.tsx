@@ -1,9 +1,10 @@
+import { ButtonLoader, Spinner } from './ui';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authApi, organizationApi } from '../api';
 import { getErrorMessage } from '../api/client';
 import { useAuthStore } from '../store/authStore';
-import { Building2, Check, Loader2, Plus } from 'lucide-react';
+import { Building2, Check, Plus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 /**
@@ -116,7 +117,7 @@ export function WorkspaceSwitcher({
                   >
                     {switchMutation.isPending &&
                       switchMutation.variables === organization.id && (
-                        <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+                        <Spinner size="xs" />
                       )}
                     Switch
                   </button>
@@ -148,7 +149,7 @@ export function WorkspaceSwitcher({
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-600/90 text-white rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {createMutation.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+            <ButtonLoader />
           ) : (
             <Plus className="h-4 w-4" aria-hidden="true" />
           )}

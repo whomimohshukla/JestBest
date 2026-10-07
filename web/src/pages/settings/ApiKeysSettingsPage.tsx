@@ -3,8 +3,8 @@ import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiKeysApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
-import { PageLoader, FieldError } from '../../components/ui';
-import { Copy, KeyRound, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { PageLoader, FieldError , ButtonLoader } from '../../components/ui';
+import { Copy, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ApiKey } from '../../types';
 
@@ -254,7 +254,7 @@ export default function ApiKeysSettingsPage() {
                     >
                       {createKeyMutation.isPending ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <ButtonLoader />
                           Creating...
                         </>
                       ) : (

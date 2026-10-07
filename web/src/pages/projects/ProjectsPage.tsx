@@ -1,3 +1,4 @@
+import { ButtonLoader, Spinner, PageLoader } from '../../components/ui';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -11,9 +12,9 @@ import {
   Search, 
   Calendar,
   Activity,
-  Loader2,
   Archive,
-  ExternalLink
+  ExternalLink,
+  TriangleAlert
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -103,14 +104,7 @@ export default function ProjectsPage() {
         </div>
 
         {/* Loading State */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <Loader2 className="w-12 h-12 text-red-500 animate-spin mx-auto mb-4" />
-              <p className="text-muted-foreground">Loading projects...</p>
-            </div>
-          </div>
-        )}
+        {isLoading && <PageLoader label="Loading projects…" />}
 
         {/* Empty State */}
         {!isLoading && isError && (
@@ -120,7 +114,7 @@ export default function ProjectsPage() {
             className="glass p-12 rounded-xl text-center"
           >
             <div className="w-20 h-20 bg-red-600/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Loader2 className="w-10 h-10 text-red-500" />
+              <TriangleAlert className="w-10 h-10 text-red-500" aria-hidden="true" />
             </div>
             <h3 className="text-xl font-semibold mb-2">Failed to load projects</h3>
             <p className="text-muted-foreground mb-6">
@@ -131,7 +125,7 @@ export default function ProjectsPage() {
               disabled={isFetching}
               className="px-6 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors font-medium inline-flex items-center gap-2 disabled:opacity-50"
             >
-              {isFetching ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
+              {isFetching ? <Spinner size="md" /> : null}
               Retry
             </button>
           </motion.div>
@@ -306,7 +300,7 @@ export default function ProjectsPage() {
                 >
                   {createProjectMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Creating...
                     </>
                   ) : (

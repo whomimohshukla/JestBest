@@ -6,7 +6,6 @@ import { testRunsApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
-  Loader2,
   RefreshCw,
   Ban,
   ArrowLeft,
@@ -26,7 +25,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
-} from '../../components/ui';
+  ButtonLoader } from '../../components/ui';
 import type { TestRun, TestResult } from '../../types';
 import { isActiveRecord, pollWhileActive } from '../../lib/polling';
 
@@ -119,7 +118,7 @@ export default function TestRunDetailPage() {
                       className="flex items-center gap-2 px-4 py-2 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors text-sm text-red-500 disabled:opacity-50"
                     >
                       {cancelRunMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <ButtonLoader />
                       ) : (
                         <Ban className="w-4 h-4" />
                       )}

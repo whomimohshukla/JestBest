@@ -1,10 +1,11 @@
+import { Spinner } from '../../components/ui';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { Mail, ArrowRight, CheckCircle2, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Logo } from '../../components/Logo';
 
 export default function ForgotPasswordPage() {
@@ -133,7 +134,7 @@ export default function ForgotPasswordPage() {
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <Spinner size="md" />
                   Sending...
                 </>
               ) : (

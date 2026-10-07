@@ -3,9 +3,9 @@ import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhooksApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
-import { PageLoader, Badge, FieldError } from '../../components/ui';
+import { PageLoader, Badge, FieldError , ButtonLoader } from '../../components/ui';
 import { WebhookDeliveries } from '../../components/WebhookDeliveries';
-import { ChevronDown, Loader2, Plus, RefreshCw, Trash2, Webhook as WebhookIcon, Zap } from 'lucide-react';
+import { ChevronDown, Plus, RefreshCw, Trash2, Webhook as WebhookIcon, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Webhook, WebhookEventType } from '../../types';
 
@@ -389,7 +389,7 @@ export default function WebhooksSettingsPage() {
                 >
                   {createWebhookMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Creating...
                     </>
                   ) : (

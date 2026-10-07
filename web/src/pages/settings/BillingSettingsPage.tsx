@@ -2,8 +2,8 @@ import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { billingApi } from '../../api';
 import { getErrorMessage, getErrorKind } from '../../api/client';
-import { PageLoader, Badge, ErrorState } from '../../components/ui';
-import { Check, CreditCard, Loader2 } from 'lucide-react';
+import { PageLoader, Badge, ErrorState , ButtonLoader } from '../../components/ui';
+import { Check, CreditCard } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface Plan {
@@ -208,7 +208,7 @@ export default function BillingSettingsPage() {
                   >
                     {isPending ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <ButtonLoader />
                         Updating...
                       </>
                     ) : (

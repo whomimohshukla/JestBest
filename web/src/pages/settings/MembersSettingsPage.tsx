@@ -4,8 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
-import { PageLoader, Select, FieldError } from '../../components/ui';
-import { Loader2, Mail, RefreshCw, Trash2, Users } from 'lucide-react';
+import { PageLoader, Select, FieldError , ButtonLoader } from '../../components/ui';
+import { Mail, RefreshCw, Trash2, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Membership, MembershipRole } from '../../types';
 
@@ -147,7 +147,7 @@ export default function MembersSettingsPage() {
           >
             {inviteMutation.isPending ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <ButtonLoader />
                 Sending...
               </>
             ) : (

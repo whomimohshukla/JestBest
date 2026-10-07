@@ -4,9 +4,9 @@ import { authApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
-import { CheckCircle2, AlertCircle, Mail, Loader2 } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Mail } from 'lucide-react';
 import { Logo } from '../../components/Logo';
-import { PageLoader } from '../../components/ui';
+import { PageLoader , Spinner } from '../../components/ui';
 
 type Status = 'idle' | 'verifying' | 'success' | 'error';
 
@@ -122,7 +122,7 @@ export default function VerifyEmailPage() {
               >
                 {isResending ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Spinner size="md" />
                     Resending...
                   </>
                 ) : (
@@ -190,7 +190,7 @@ export default function VerifyEmailPage() {
                 >
                   {isResending ? (
                     <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <Spinner size="md" />
                       Resending...
                     </>
                   ) : (

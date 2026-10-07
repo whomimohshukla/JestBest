@@ -7,7 +7,6 @@ import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
   Plus,
-  Loader2,
   Copy,
   Archive,
   Trash2,
@@ -29,7 +28,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
-  HowToBox } from '../../components/ui';
+  HowToBox , ButtonLoader } from '../../components/ui';
 import type { TestCase, TestCaseType } from '../../types';
 
 const TEST_TYPES: TestCaseType[] = ['FUNCTIONAL', 'HAPPY_PATH', 'NEGATIVE', 'EDGE_CASE', 'REGRESSION', 'SMOKE'];
@@ -529,7 +528,7 @@ export default function TestCasesPage() {
                 >
                   {generateTestCaseMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Generating...
                     </>
                   ) : (
@@ -768,7 +767,7 @@ export default function TestCasesPage() {
                 >
                   {createTestCaseMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Creating...
                     </>
                   ) : (

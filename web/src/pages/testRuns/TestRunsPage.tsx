@@ -7,7 +7,6 @@ import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
   Plus,
-  Loader2,
   Ban,
   ExternalLink,
   ListChecks,
@@ -22,7 +21,7 @@ import {
   EmptyState,
   PageLoader,
   HowToBox,
-  FieldError } from '../../components/ui';
+  FieldError , ButtonLoader } from '../../components/ui';
 import type { TestRun, TestCase } from '../../types';
 import { hasActiveItems, pollWhileActive } from '../../lib/polling';
 
@@ -348,7 +347,7 @@ export default function TestRunsPage() {
                   </label>
                   {projectTestCasesLoading ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Loading test cases...
                     </div>
                   ) : (projectTestCases?.items ?? []).length === 0 ? (
@@ -396,7 +395,7 @@ export default function TestRunsPage() {
                 >
                   {createRunMutation.isPending ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <ButtonLoader />
                       Starting...
                     </>
                   ) : (
