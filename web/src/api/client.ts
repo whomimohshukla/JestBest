@@ -28,9 +28,16 @@ const clearTokens = () => {
   localStorage.removeItem('refreshToken');
 };
 
-const completeRefresh = (accessToken: string) => {
-  localStorage.setItem('accessToken', accessToken);
-  refreshQueue.forEach(({ onSuccess }) => onSuccess(accessToken));
+const completeRefresh = (tokens: { accessToken: string; refreshToken?: string }) => {
+  localStorage.setItem('accessToken', tokens.accessToken);
+  // The server rotates refresh tokens: the presented one is deleted as soon as
+  // it is exchanged. Persisting only the access token left the client holding a
+  // token the server had already discarded, so the second refresh failed and
+  // the session ended ~15 minutes after login.
+  if (tokens.refreshToken) {
+    localStorage.setItem('refreshToken', tokens.refreshToken);
+  }
+  refreshQueue.forEach(({ onSuccess }) => onSuccess(tokens.accessToken));
   refreshQueue = [];
   isRefreshing = false;
 };
@@ -52,10 +59,10 @@ const refreshAccessToken = async (): Promise<string> => {
     try {
       const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, { refreshToken });
       const tokens = response.data?.data?.tokens ?? response.data?.data;
-      const token = tokens?.accessToken ?? response.data?.data?.token;
-      if (!token) throw new Error('Refresh failed');
-      completeRefresh(token);
-      return token;
+      const accessToken = tokens?.accessToken ?? response.data?.data?.token;
+      if (!accessToken) throw new Error('Refresh failed');
+      completeRefresh({ accessToken, refreshToken: tokens?.refreshToken });
+      return accessToken;
     } catch (error) {
       failRefresh(error);
       throw error;

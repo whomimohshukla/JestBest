@@ -1,5 +1,5 @@
 import { apiGet, apiPost, apiPatch, apiDelete, apiPaginated } from './client';
-import type { AgentRun, Integration, Webhook, WebhookDelivery, ApiKey, Billing, User } from '../types';
+import type { AgentRun, Integration, Webhook, WebhookDelivery, ApiKey, Billing, BillingUsage, User } from '../types';
 
 export const usersApi = {
   me: () =>
@@ -69,7 +69,7 @@ export const billingApi = {
   subscription: () => apiGet<Billing>('/billing/subscription'),
   updatePlan: (plan: string) =>
     apiPatch<Billing>('/billing/subscription', { plan }),
-  usage: () => apiGet<{ testRunsUsed: number; testRunLimit: number; month: string }>('/billing/usage'),
+  usage: () => apiGet<BillingUsage>('/billing/usage'),
 };
 
 export { apiGet, apiPost, apiPatch, apiDelete, apiPaginated };

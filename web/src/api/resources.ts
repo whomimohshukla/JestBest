@@ -18,7 +18,8 @@ export interface BugComment {
   content: string;
   createdById: string | null;
   createdAt: string;
-  creator?: { id: string; name: string | null; email: string } | null;
+  /** The Prisma relation on BugComment is `user`, not `creator`. */
+  user?: { id: string; name: string | null; email: string } | null;
 }
 
 export const projectsApi = {

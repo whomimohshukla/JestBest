@@ -1,3 +1,4 @@
+import { formatDuration } from '../../lib/format';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -34,12 +35,6 @@ const RESULT_STATUS_COLORS: Record<string, string> = {
   FAILED: 'text-red-400 bg-red-500/10 border-red-500/20',
   SKIPPED: 'text-gray-400 bg-gray-500/10 border-gray-500/20',
   PENDING: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
-};
-
-const formatDuration = (duration: number | null | undefined): string => {
-  if (duration == null) return '—';
-  if (duration < 1) return `${Math.round(duration * 1000)}ms`;
-  return `${duration.toFixed(2)}s`;
 };
 
 export default function TestRunDetailPage() {

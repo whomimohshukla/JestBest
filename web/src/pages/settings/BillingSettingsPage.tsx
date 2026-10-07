@@ -12,6 +12,8 @@ interface Plan {
   price: number | 'Custom';
   description: string;
   features: string[];
+  /** Monthly test-run allowance. The API has no plan table, so this is the source of truth. */
+  testRunLimit: number;
 }
 
 const PLANS: Plan[] = [
@@ -21,6 +23,7 @@ const PLANS: Plan[] = [
     price: 0,
     description: 'For individuals getting started',
     features: ['5 test runs/mo', '1 project', 'Community support'],
+    testRunLimit: 5,
   },
   {
     key: 'PRO',
@@ -28,6 +31,7 @@ const PLANS: Plan[] = [
     price: 29,
     description: 'For small teams',
     features: ['500 test runs/mo', '10 projects', 'Email support'],
+    testRunLimit: 500,
   },
   {
     key: 'BUSINESS',
@@ -35,6 +39,7 @@ const PLANS: Plan[] = [
     price: 99,
     description: 'For growing teams',
     features: ['5,000 test runs/mo', 'Unlimited projects', 'Priority support', 'AI agents'],
+    testRunLimit: 5000,
   },
   {
     key: 'ENTERPRISE',
@@ -42,6 +47,8 @@ const PLANS: Plan[] = [
     price: 'Custom',
     description: 'For large orgs',
     features: ['Unlimited runs', 'SSO', 'Dedicated support'],
+    // Unlimited: rendered as a full bar with no numeric ceiling.
+    testRunLimit: Number.POSITIVE_INFINITY,
   },
 ];
 
@@ -70,10 +77,20 @@ export default function BillingSettingsPage() {
   });
 
   const currentPlan = subscription?.plan;
+  // The API returns usage rows, not a pre-computed pair. `latest` is the
+  // organization's most recent month of recorded usage.
+  const testsUsed = usage?.latest?.testsRun ?? 0;
+  const currentPlanMeta = PLANS.find((p) => p.key === currentPlan);
+  const testRunLimit = currentPlanMeta?.testRunLimit ?? 0;
+  const isUnlimited = testRunLimit === Number.POSITIVE_INFINITY;
   const percent =
-    usage && usage.testRunLimit > 0
-      ? Math.min(100, Math.round((usage.testRunsUsed / usage.testRunLimit) * 100))
-      : 0;
+    isUnlimited || testRunLimit <= 0 ? 0 : Math.min(100, Math.round((testsUsed / testRunLimit) * 100));
+  const usageMonth = usage?.latest?.month
+    ? new Date(usage.latest.month).toLocaleDateString(undefined, {
+        month: 'long',
+        year: 'numeric',
+      })
+    : null;
 
   const priceLabel = (price: number | 'Custom') =>
     price === 'Custom' ? 'Custom' : `$${price}/mo`;
@@ -111,7 +128,7 @@ export default function BillingSettingsPage() {
           <div>
             <h2 className="text-lg font-semibold mb-1">Usage</h2>
             <p className="text-sm text-muted-foreground">
-              {usage?.month ? `Usage for ${usage.month}` : 'Test runs this month'}
+              {usageMonth ? `Usage for ${usageMonth}` : 'Test runs this month'}
             </p>
           </div>
         </div>
@@ -122,9 +139,12 @@ export default function BillingSettingsPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium">
-                Tests used this month: {usage?.testRunsUsed ?? 0} / {usage?.testRunLimit ?? 0}
+                Tests used this month: {testsUsed}{' '}
+                {isUnlimited ? '/ unlimited' : `/ ${testRunLimit}`}
               </p>
-              <p className="text-sm text-muted-foreground">{percent}%</p>
+              {!isUnlimited && testRunLimit > 0 && (
+                <p className="text-sm text-muted-foreground">{percent}%</p>
+              )}
             </div>
             <div className="h-3 bg-secondary/50 rounded-full overflow-hidden">
               <div
@@ -132,6 +152,11 @@ export default function BillingSettingsPage() {
                 style={{ width: `${percent}%` }}
               />
             </div>
+            {testsUsed === 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                No runs recorded yet this period.
+              </p>
+            )}
           </div>
         )}
       </div>

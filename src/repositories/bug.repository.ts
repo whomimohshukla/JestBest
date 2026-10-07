@@ -1,12 +1,29 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../config/database';
 
+/**
+ * The only User columns safe to embed in a response. Anything else (notably
+ * `passwordHash` and `twoFactorSecret`) must never leave the database.
+ */
+const PUBLIC_USER = {
+  id: true,
+  name: true,
+  email: true,
+  avatar: true,
+} as const;
+
 export const bugRepository = {
   findById: (id: string) =>
     prisma.bug.findUnique({
       where: { id },
       include: {
-        comments: { include: { user: true } },
+        // An explicit `select` is required here: `user: true` returned every
+        // scalar column on User, so `GET /bugs/:id` serialized each commenter's
+        // passwordHash and twoFactorSecret straight to the client. The list
+        // query below already models the correct shape.
+        comments: { include: { user: { select: PUBLIC_USER } } },
+        assignee: { select: PUBLIC_USER },
+        creator: { select: PUBLIC_USER },
         testResults: true,
         attachments: true,
       },
@@ -50,8 +67,8 @@ export const bugRepository = {
       take,
       orderBy: { createdAt: 'desc' },
       include: {
-        assignee: { select: { id: true, name: true, email: true, avatar: true } },
-        creator: { select: { id: true, name: true, email: true, avatar: true } },
+        assignee: { select: PUBLIC_USER },
+        creator: { select: PUBLIC_USER },
       },
     }),
 

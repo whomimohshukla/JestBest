@@ -10,6 +10,9 @@ export const RunStatusBadge = ({ status }: { status: string }) => {
     CANCELLED: { label: 'Cancelled', variant: 'secondary' },
     QUEUED: { label: 'Queued', variant: 'secondary' },
     ERRORED: { label: 'Errored', variant: 'warning' },
+    // SKIPPED is a member of the Prisma TestStatus enum and had no entry, so
+    // skipped results rendered as a raw uppercase token.
+    SKIPPED: { label: 'Skipped', variant: 'secondary' },
   };
   const config = map[status] ?? { label: status, variant: 'secondary' as const };
   return <Badge variant={config.variant}>{config.label}</Badge>;
@@ -22,7 +25,8 @@ export const BugStatusBadge = ({ status }: { status: string }) => {
     FIXED: { label: 'Fixed', variant: 'success' },
     VERIFIED: { label: 'Verified', variant: 'success' },
     CLOSED: { label: 'Closed', variant: 'secondary' },
-    WONT_FIX: { label: "Won't Fix", variant: 'secondary' },
+    REJECTED: { label: 'Rejected', variant: 'secondary' },
+    DUPLICATE: { label: 'Duplicate', variant: 'secondary' },
   };
   const config = map[status] ?? { label: status, variant: 'secondary' as const };
   return <Badge variant={config.variant}>{config.label}</Badge>;

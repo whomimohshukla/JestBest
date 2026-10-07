@@ -30,8 +30,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { BugStatus } from '../../types';
-
-const BUG_STATUSES: BugStatus[] = ['OPEN', 'IN_PROGRESS', 'FIXED', 'VERIFIED', 'CLOSED', 'WONT_FIX'];
+import { BUG_STATUSES } from '../../lib/bugStatus';
 
 const getRelativeTime = (date: string) => {
   const diff = Date.now() - new Date(date).getTime();
@@ -290,14 +289,14 @@ export default function BugDetailPage() {
                 {comments.map((item: BugComment) => (
                   <div key={item.id} className="flex gap-3">
                     <div className="w-9 h-9 rounded-full bg-red-600/10 flex items-center justify-center text-sm font-semibold text-red-500 shrink-0">
-                      {item.creator?.name?.[0]?.toUpperCase() ||
-                        item.creator?.email?.[0]?.toUpperCase() ||
+                      {item.user?.name?.[0]?.toUpperCase() ||
+                        item.user?.email?.[0]?.toUpperCase() ||
                         'U'}
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-sm font-medium">
-                          {item.creator?.name || item.creator?.email || 'Unknown user'}
+                          {item.user?.name || item.user?.email || 'Unknown user'}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {getRelativeTime(item.createdAt)}

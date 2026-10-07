@@ -217,7 +217,15 @@ export interface TestResult {
 // ===== Bugs =====
 export type BugSeverity = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 export type BugPriority = 'P0' | 'P1' | 'P2' | 'P3';
-export type BugStatus = 'OPEN' | 'IN_PROGRESS' | 'FIXED' | 'VERIFIED' | 'CLOSED' | 'WONT_FIX';
+/** Mirrors the Prisma `BugStatus` enum. Keep in sync with schema.prisma. */
+export type BugStatus =
+  | 'OPEN'
+  | 'IN_PROGRESS'
+  | 'FIXED'
+  | 'VERIFIED'
+  | 'CLOSED'
+  | 'REJECTED'
+  | 'DUPLICATE';
 
 export interface Bug {
   id: string;
@@ -383,7 +391,11 @@ export interface Webhook {
   organizationId: string;
   projectId: string | null;
   url: string;
-  secret: string;
+  /**
+   * Only ever populated on the create response. The list, get and update
+   * endpoints redact it, so treat its absence as normal, not as an error.
+   */
+  secret?: string;
   eventTypes: WebhookEventType[];
   isActive: boolean;
   lastTriggeredAt: string | null;
@@ -427,14 +439,41 @@ export interface BillingPlan {
   features: string[];
 }
 
+/** Matches the Prisma `Subscription` model returned by /billing/subscription. */
 export interface Billing {
   id: string;
   organizationId: string;
   plan: string;
   status: string;
-  testRunsUsed: number;
-  testRunLimit: number;
-  renewalDate: string | null;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+  currentPeriodStart: Date | string | null;
+  currentPeriodEnd: Date | string | null;
+  cancelAtPeriodEnd: boolean;
+}
+
+/** Matches the Prisma `Usage` model. */
+export interface Usage {
+  id: string;
+  organizationId: string;
+  month: string;
+  testsRun: number;
+  browserMinutes: number;
+  aiTokensUsed: number;
+  apiRequests: number;
+  estimatedCostUsd: number;
+}
+
+/**
+ * `GET /billing/usage` returns the subscription alongside the current and
+ * historical usage rows. It never returned `testRunsUsed`/`testRunLimit`, which
+ * is why the panel read `0 / 0` for every organization.
+ */
+export interface BillingUsage {
+  subscription: Billing | null;
+  current: Usage | null;
+  history: Usage[];
+  latest: Usage | null;
 }
 
 // ===== Audit =====

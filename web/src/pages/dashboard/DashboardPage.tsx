@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import Layout from '../../components/Layout';
@@ -21,6 +22,12 @@ import { getErrorMessage } from '../../api/client';
 import type { Project, TestRun, DashboardAnalytics } from '../../types';
 
 export default function DashboardPage() {
+  // The quality score and release-risk cards are project-scoped on the server:
+  // the API returns them only when `projectId` is supplied, and always returned
+  // null before, so both cards silently never rendered. The selector below is
+  // what makes them populate.
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+
   const {
     data: dash,
     isLoading,
@@ -28,8 +35,9 @@ export default function DashboardPage() {
     refetch,
     isFetching,
   } = useQuery<DashboardAnalytics>({
-    queryKey: ['dashboard-analytics'],
-    queryFn: () => analyticsApi.dashboard() as Promise<DashboardAnalytics>,
+    queryKey: ['dashboard-analytics', selectedProjectId],
+    queryFn: () =>
+      analyticsApi.dashboard(selectedProjectId || undefined) as Promise<DashboardAnalytics>,
   });
 
   const { data: projects } = useQuery<{ items: Project[] }>({
@@ -109,6 +117,30 @@ export default function DashboardPage() {
           </div>
         }
       />
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label htmlFor="dashboard-project" className="text-sm text-muted-foreground">
+          Project
+        </label>
+        <select
+          id="dashboard-project"
+          value={selectedProjectId}
+          onChange={(e) => setSelectedProjectId(e.target.value)}
+          className="rounded-lg border border-border bg-card px-3 py-2 text-sm font-medium"
+        >
+          <option value="">All projects</option>
+          {projectList.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        {!selectedProjectId && (
+          <p className="text-xs text-muted-foreground">
+            Quality score and release risk are computed per project — pick one to see them.
+          </p>
+        )}
+      </div>
 
       {isLoading ? (
         <PageLoader label="Loading dashboard…" />
