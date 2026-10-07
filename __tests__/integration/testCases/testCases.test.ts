@@ -44,10 +44,7 @@ afterAll(async () => {
 
 describe('POST /test-cases', () => {
   it('creates a test case and applies schema defaults', async () => {
-    const res = await api
-      .post(`${API}/test-cases`)
-      .set(auth(user))
-      .send({ projectId, title: 'Login works' });
+    const res = await api.post(`${API}/test-cases`).set(auth(user)).send({ projectId, title: 'Login works' });
 
     expect(res.status).toBe(201);
     expect(res.body.data.title).toBe('Login works');
@@ -81,10 +78,7 @@ describe('POST /test-cases', () => {
 
   it('refuses to attach a test case to a project in another organization', async () => {
     const other = await createTestUser(api, { organizationName: 'Other Org' });
-    const otherProject = await api
-      .post(`${API}/projects`)
-      .set(auth(other))
-      .send({ name: 'Foreign Project' });
+    const otherProject = await api.post(`${API}/projects`).set(auth(other)).send({ name: 'Foreign Project' });
 
     const res = await api
       .post(`${API}/test-cases`)
@@ -95,7 +89,7 @@ describe('POST /test-cases', () => {
 });
 
 describe('GET /test-cases', () => {
-  it('lists the organization\'s test cases in a pagination envelope', async () => {
+  it("lists the organization's test cases in a pagination envelope", async () => {
     await api.post(`${API}/test-cases`).set(auth(user)).send(newCase('A'));
     await api.post(`${API}/test-cases`).set(auth(user)).send(newCase('B'));
 
@@ -243,10 +237,7 @@ describe('POST /test-cases/generate', () => {
 
   it('rejects generation for a project in another organization', async () => {
     const other = await createTestUser(api, { organizationName: 'Other Org' });
-    const otherProject = await api
-      .post(`${API}/projects`)
-      .set(auth(other))
-      .send({ name: 'Foreign Project' });
+    const otherProject = await api.post(`${API}/projects`).set(auth(other)).send({ name: 'Foreign Project' });
     const foreignId = otherProject.body.data.id as string;
 
     const res = await api

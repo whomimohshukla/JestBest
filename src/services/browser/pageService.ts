@@ -35,7 +35,12 @@ export const pageService = {
     return results;
   },
 
-  async executeStep(page: Page, step: TestStep, index: number, baseUrl?: string): Promise<StepExecutionResult> {
+  async executeStep(
+    page: Page,
+    step: TestStep,
+    index: number,
+    baseUrl?: string
+  ): Promise<StepExecutionResult> {
     const timeout = step.timeout ?? DEFAULT_TIMEOUT;
     try {
       switch (step.action) {

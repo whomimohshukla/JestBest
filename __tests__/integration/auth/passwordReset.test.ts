@@ -45,18 +45,14 @@ describe('password reset token hardening', () => {
     expect(response.status).toBe(401);
 
     // The account must be untouched.
-    const login = await api
-      .post(`${API}/auth/login`)
-      .send({ email: user.email, password: TEST_PASSWORD });
+    const login = await api.post(`${API}/auth/login`).send({ email: user.email, password: TEST_PASSWORD });
     expect(login.status).toBe(200);
   });
 
   it('accepts a purpose-bound reset token and swaps the password', async () => {
     const token = await tokenService.issuePasswordResetToken(user.userId);
 
-    const response = await api
-      .post(`${API}/auth/reset-password`)
-      .send({ token, password: NEW_PASSWORD });
+    const response = await api.post(`${API}/auth/reset-password`).send({ token, password: NEW_PASSWORD });
     expect(response.status).toBe(200);
 
     const oldPassword = await api
@@ -73,14 +69,10 @@ describe('password reset token hardening', () => {
   it('burns the reset token so it cannot be replayed', async () => {
     const token = await tokenService.issuePasswordResetToken(user.userId);
 
-    const first = await api
-      .post(`${API}/auth/reset-password`)
-      .send({ token, password: NEW_PASSWORD });
+    const first = await api.post(`${API}/auth/reset-password`).send({ token, password: NEW_PASSWORD });
     expect(first.status).toBe(200);
 
-    const replay = await api
-      .post(`${API}/auth/reset-password`)
-      .send({ token, password: 'YetAnother789!' });
+    const replay = await api.post(`${API}/auth/reset-password`).send({ token, password: 'YetAnother789!' });
     expect(replay.status).toBe(401);
     expect(replay.body.error.message).toMatch(/already been used|expired/i);
   });
@@ -90,9 +82,7 @@ describe('password reset token hardening', () => {
     expect(before.status).toBe(200);
 
     const token = await tokenService.issuePasswordResetToken(user.userId);
-    const reset = await api
-      .post(`${API}/auth/reset-password`)
-      .send({ token, password: NEW_PASSWORD });
+    const reset = await api.post(`${API}/auth/reset-password`).send({ token, password: NEW_PASSWORD });
     expect(reset.status).toBe(200);
 
     // The version bumped, so the pre-reset access token is now dead.
@@ -117,14 +107,10 @@ describe('password reset token hardening', () => {
     // safe if it cannot also reject a token minted moments later, which is the
     // bug a second-granular `iat` comparison introduces.
     const token = await tokenService.issuePasswordResetToken(user.userId);
-    const reset = await api
-      .post(`${API}/auth/reset-password`)
-      .send({ token, password: NEW_PASSWORD });
+    const reset = await api.post(`${API}/auth/reset-password`).send({ token, password: NEW_PASSWORD });
     expect(reset.status).toBe(200);
 
-    const login = await api
-      .post(`${API}/auth/login`)
-      .send({ email: user.email, password: NEW_PASSWORD });
+    const login = await api.post(`${API}/auth/login`).send({ email: user.email, password: NEW_PASSWORD });
     expect(login.status).toBe(200);
 
     const fresh = login.body.data.tokens.accessToken as string;

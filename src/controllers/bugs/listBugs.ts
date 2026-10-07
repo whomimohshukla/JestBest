@@ -20,8 +20,7 @@ export const listBugs = async (req: Request, res: Response): Promise<void> => {
     }
   }
 
-  const where: Prisma.BugWhereInput =
-    projectId && req.orgId ? { projectId } : { organizationId: req.orgId };
+  const where: Prisma.BugWhereInput = projectId && req.orgId ? { projectId } : { organizationId: req.orgId };
   const result = await bugService.list(where, page, pageSize, { status, severity });
   res.status(200).json(ok(result));
 };

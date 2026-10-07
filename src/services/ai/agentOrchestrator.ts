@@ -34,7 +34,10 @@ const HEALING_AGENT_NODE = 'agent:HEALING_AGENT';
 const CODE_AGENT_NODE = 'agent:CODE_AGENT';
 const PERSIST_NODE = 'persist';
 
-const AGENTS: Record<string, { execute(context: AgentContext, input: AgentInput): Promise<AgentResult<unknown>> }> = {
+const AGENTS: Record<
+  string,
+  { execute(context: AgentContext, input: AgentInput): Promise<AgentResult<unknown>> }
+> = {
   EXPLORER: explorerAgent,
   TEST_GENERATOR: testGeneratorAgent,
   FAILURE_ANALYZER: failureAnalyzerAgent,
@@ -49,28 +52,33 @@ const buildAgentGraph = () => {
 
   builder
     .node(SELECT_NODE, ({ agentType, agentInput, context }) => ({ agentType, agentInput, context }))
-    .addConditionalEdges(
-      SELECT_NODE,
-      (state) => state.agentType ?? 'UNKNOWN',
-      {
-        EXPLORER: EXPLORER_NODE,
-        TEST_GENERATOR: TEST_GENERATOR_NODE,
-        FAILURE_ANALYZER: FAILURE_ANALYZER_NODE,
-        BUG_AGENT: BUG_AGENT_NODE,
-        HEALING_AGENT: HEALING_AGENT_NODE,
-        CODE_AGENT: CODE_AGENT_NODE,
-        FIX_AGENT: CODE_AGENT_NODE,
-      }
-    )
+    .addConditionalEdges(SELECT_NODE, (state) => state.agentType ?? 'UNKNOWN', {
+      EXPLORER: EXPLORER_NODE,
+      TEST_GENERATOR: TEST_GENERATOR_NODE,
+      FAILURE_ANALYZER: FAILURE_ANALYZER_NODE,
+      BUG_AGENT: BUG_AGENT_NODE,
+      HEALING_AGENT: HEALING_AGENT_NODE,
+      CODE_AGENT: CODE_AGENT_NODE,
+      FIX_AGENT: CODE_AGENT_NODE,
+    })
     .node(EXPLORER_NODE, (s) => executeAgent('EXPLORER', s.context!, s.agentInput))
     .node(TEST_GENERATOR_NODE, (s) => executeAgent('TEST_GENERATOR', s.context!, s.agentInput))
     .node(FAILURE_ANALYZER_NODE, (s) => executeAgent('FAILURE_ANALYZER', s.context!, s.agentInput))
     .node(BUG_AGENT_NODE, (s) => executeAgent('BUG_AGENT', s.context!, s.agentInput))
     .node(HEALING_AGENT_NODE, (s) => executeAgent('HEALING_AGENT', s.context!, s.agentInput))
-    .node(CODE_AGENT_NODE, (s) => executeAgent((s.agentType ?? 'CODE_AGENT') as AgentType, s.context!, s.agentInput))
+    .node(CODE_AGENT_NODE, (s) =>
+      executeAgent((s.agentType ?? 'CODE_AGENT') as AgentType, s.context!, s.agentInput)
+    )
     .node(PERSIST_NODE, () => ({}));
 
-  for (const nodeId of [EXPLORER_NODE, TEST_GENERATOR_NODE, FAILURE_ANALYZER_NODE, BUG_AGENT_NODE, HEALING_AGENT_NODE, CODE_AGENT_NODE]) {
+  for (const nodeId of [
+    EXPLORER_NODE,
+    TEST_GENERATOR_NODE,
+    FAILURE_ANALYZER_NODE,
+    BUG_AGENT_NODE,
+    HEALING_AGENT_NODE,
+    CODE_AGENT_NODE,
+  ]) {
     builder.addEdge(nodeId, PERSIST_NODE);
   }
   builder.addEdge(PERSIST_NODE, '__end__');
@@ -113,10 +121,7 @@ export const agentOrchestrator = {
         errorMessage: `Agent type ${agentRun.agentType} is not implemented. Supported: ${SUPPORTED_AGENT_TYPES.join(', ')}.`,
         completedAt: new Date(),
       });
-      logger.error(
-        { agentRunId, agentType: agentRun.agentType },
-        'refusing to run unsupported agent type'
-      );
+      logger.error({ agentRunId, agentType: agentRun.agentType }, 'refusing to run unsupported agent type');
       return;
     }
 

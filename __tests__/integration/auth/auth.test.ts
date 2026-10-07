@@ -90,9 +90,7 @@ describe('POST /auth/register', () => {
 describe('POST /auth/verify-email', () => {
   it('marks the account verified and unlocks login', async () => {
     const email = uniqueEmail('verify');
-    const register = await api
-      .post(`${API}/auth/register`)
-      .send({ email, password: TEST_PASSWORD });
+    const register = await api.post(`${API}/auth/register`).send({ email, password: TEST_PASSWORD });
 
     const blocked = await api.post(`${API}/auth/login`).send({ email, password: TEST_PASSWORD });
     expect(blocked.status).toBe(200);
@@ -142,9 +140,7 @@ describe('POST /auth/login', () => {
 describe('POST /auth/refresh-token', () => {
   it('issues a fresh access token for a valid refresh token', async () => {
     const user = await createTestUser(api);
-    const res = await api
-      .post(`${API}/auth/refresh-token`)
-      .send({ refreshToken: user.refreshToken });
+    const res = await api.post(`${API}/auth/refresh-token`).send({ refreshToken: user.refreshToken });
 
     expect(res.status).toBe(200);
     const tokens = res.body.data.tokens ?? res.body.data;
@@ -154,9 +150,7 @@ describe('POST /auth/refresh-token', () => {
 
   it('rejects an access token used as a refresh token', async () => {
     const user = await createTestUser(api);
-    const res = await api
-      .post(`${API}/auth/refresh-token`)
-      .send({ refreshToken: user.accessToken });
+    const res = await api.post(`${API}/auth/refresh-token`).send({ refreshToken: user.accessToken });
     expect(res.status).toBe(401);
   });
 
@@ -191,9 +185,7 @@ describe('GET /users/me', () => {
     const created = await api.post(`${API}/api-keys`).set(auth(user)).send({ name: 'k' });
     expect(created.status).toBe(201);
 
-    const res = await api
-      .get(`${API}/users/me`)
-      .set({ 'x-api-key': created.body.data.plainKey });
+    const res = await api.get(`${API}/users/me`).set({ 'x-api-key': created.body.data.plainKey });
     expect(res.status).toBe(401);
   });
 });
@@ -209,14 +201,10 @@ describe('POST /users/me/change-password', () => {
       .send({ currentPassword: TEST_PASSWORD, newPassword });
     expect(changed.status).toBe(200);
 
-    const oldLogin = await api
-      .post(`${API}/auth/login`)
-      .send({ email: user.email, password: TEST_PASSWORD });
+    const oldLogin = await api.post(`${API}/auth/login`).send({ email: user.email, password: TEST_PASSWORD });
     expect(oldLogin.status).toBe(401);
 
-    const newLogin = await api
-      .post(`${API}/auth/login`)
-      .send({ email: user.email, password: newPassword });
+    const newLogin = await api.post(`${API}/auth/login`).send({ email: user.email, password: newPassword });
     expect(newLogin.status).toBe(200);
   });
 

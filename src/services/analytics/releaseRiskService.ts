@@ -30,19 +30,19 @@ export const releaseRiskService = {
     changedFiles: string[]
   ): Promise<ReleaseRiskAnalysis> {
     logger.info({ projectId, gitCommitHash, fileCount: changedFiles.length }, 'Calculating release risk');
-    
+
     // Find tests that cover the changed files
     const affectedTests = await this.findAffectedTests(projectId, changedFiles);
-    
+
     // Analyze historical failures for these tests
     const historicalFailures = await this.getHistoricalFailures(
       affectedTests.map((t) => t.id),
       30 // last 30 days
     );
-    
+
     // Check for flaky tests in the affected set
     const flakyTests = await this.countFlakyTests(affectedTests.map((t) => t.id));
-    
+
     // Calculate base risk score
     const riskScore = this.calculateRiskScore({
       changedFilesCount: changedFiles.length,
@@ -50,15 +50,15 @@ export const releaseRiskService = {
       historicalFailures,
       flakyTests,
     });
-    
+
     const riskLevel = this.getRiskLevel(riskScore);
-    
+
     // Identify high-risk areas
     const highRiskAreas = this.identifyHighRiskAreas(changedFiles, affectedTests, historicalFailures);
-    
+
     // Generate recommendations
     const recommendations = this.generateRecommendations(riskLevel, affectedTests.length, flakyTests);
-    
+
     const analysis: ReleaseRiskAnalysis = {
       gitCommitHash,
       branchName,
@@ -79,7 +79,7 @@ export const releaseRiskService = {
         recommendations,
       },
     };
-    
+
     // Save to database
     await prisma.releaseAnalysis.create({
       data: {
@@ -96,15 +96,12 @@ export const releaseRiskService = {
         analysisDetails: analysis.analysisDetails as any,
       },
     });
-    
-    logger.info(
-      { projectId, gitCommitHash, riskScore, riskLevel },
-      'Release risk calculation complete'
-    );
-    
+
+    logger.info({ projectId, gitCommitHash, riskScore, riskLevel }, 'Release risk calculation complete');
+
     return analysis;
   },
-  
+
   /**
    * Find tests that might be affected by file changes
    */
@@ -125,7 +122,7 @@ export const releaseRiskService = {
         },
       },
     });
-    
+
     // Simple heuristic: tests that mention changed files or features
     // In a real implementation, this would use code coverage data
     const affectedTests = tests
@@ -137,12 +134,12 @@ export const releaseRiskService = {
           const feature = filename.split('.')[0];
           return testContent.includes(feature);
         });
-        
+
         if (!isAffected && changedFiles.length > 5) {
           // If many files changed, consider all tests affected
           return { test, isAffected: true };
         }
-        
+
         return { test, isAffected };
       })
       .filter((t) => t.isAffected)
@@ -150,17 +147,15 @@ export const releaseRiskService = {
         // Calculate failure rate
         const results = test.testResults;
         const failureRate =
-          results.length > 0
-            ? results.filter((r) => r.status === 'FAILED').length / results.length
-            : 0;
-        
+          results.length > 0 ? results.filter((r) => r.status === 'FAILED').length / results.length : 0;
+
         return {
           id: test.id,
           title: test.title,
           failureRate,
         };
       });
-    
+
     // If no specific tests found, return high-priority tests
     if (affectedTests.length === 0) {
       return tests
@@ -168,16 +163,16 @@ export const releaseRiskService = {
         .slice(0, 10)
         .map((t) => ({ id: t.id, title: t.title }));
     }
-    
+
     return affectedTests;
   },
-  
+
   /**
    * Get historical failure count for tests
    */
   async getHistoricalFailures(testCaseIds: string[], days: number): Promise<number> {
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    
+
     const count = await prisma.testResult.count({
       where: {
         testCaseId: { in: testCaseIds },
@@ -185,10 +180,10 @@ export const releaseRiskService = {
         createdAt: { gte: since },
       },
     });
-    
+
     return count;
   },
-  
+
   /**
    * Count flaky tests in the set
    */
@@ -199,10 +194,10 @@ export const releaseRiskService = {
         flakyScore: { gte: 20 },
       },
     });
-    
+
     return count;
   },
-  
+
   /**
    * Calculate risk score (0-100)
    */
@@ -219,23 +214,23 @@ export const releaseRiskService = {
       historicalFailures: 0.4,
       flakyTests: 0.2,
     };
-    
+
     // Normalize factors to 0-100 scale
     const normalizedChangedFiles = Math.min(factors.changedFilesCount * 2, 100);
     const normalizedAffectedTests = Math.min(factors.affectedTestsCount * 1.5, 100);
     const normalizedHistoricalFailures = Math.min(factors.historicalFailures * 5, 100);
     const normalizedFlakyTests = Math.min(factors.flakyTests * 10, 100);
-    
+
     // Calculate weighted score
     const score =
       normalizedChangedFiles * weights.changedFiles +
       normalizedAffectedTests * weights.affectedTests +
       normalizedHistoricalFailures * weights.historicalFailures +
       normalizedFlakyTests * weights.flakyTests;
-    
+
     return Math.round(Math.min(100, Math.max(0, score)));
   },
-  
+
   /**
    * Determine risk level from score
    */
@@ -245,7 +240,7 @@ export const releaseRiskService = {
     if (score >= 25) return 'MEDIUM';
     return 'LOW';
   },
-  
+
   /**
    * Identify high-risk areas based on changes and test history
    */
@@ -255,7 +250,7 @@ export const releaseRiskService = {
     historicalFailures: number
   ): string[] {
     const areas: string[] = [];
-    
+
     // Check for critical file types
     const criticalPatterns = [
       { pattern: /auth|login|security/, area: 'Authentication & Security' },
@@ -264,31 +259,31 @@ export const releaseRiskService = {
       { pattern: /api|endpoint|route/, area: 'API Endpoints' },
       { pattern: /config|env/, area: 'Configuration' },
     ];
-    
+
     for (const { pattern, area } of criticalPatterns) {
       if (changedFiles.some((file) => pattern.test(file.toLowerCase()))) {
         areas.push(area);
       }
     }
-    
+
     // Check test failure rates
     const highFailureTests = affectedTests.filter((t) => (t.failureRate || 0) > 0.3);
     if (highFailureTests.length > 0) {
       areas.push(`${highFailureTests.length} tests with high failure rates`);
     }
-    
+
     // Historical failures
     if (historicalFailures > 10) {
       areas.push('Area with frequent recent failures');
     }
-    
+
     if (areas.length === 0) {
       areas.push('No specific high-risk areas identified');
     }
-    
+
     return areas;
   },
-  
+
   /**
    * Generate recommendations based on risk analysis
    */
@@ -298,7 +293,7 @@ export const releaseRiskService = {
     flakyTestCount: number
   ): string[] {
     const recommendations: string[] = [];
-    
+
     if (riskLevel === 'CRITICAL') {
       recommendations.push('⛔ Consider delaying deployment until issues are resolved');
       recommendations.push('Run full regression test suite');
@@ -317,18 +312,18 @@ export const releaseRiskService = {
       recommendations.push('✅ Safe to deploy with standard procedures');
       recommendations.push('Run smoke tests after deployment');
     }
-    
+
     if (affectedTestCount > 0) {
       recommendations.push(`Execute ${affectedTestCount} affected tests before deployment`);
     }
-    
+
     if (flakyTestCount > 0) {
       recommendations.push(`Fix or disable ${flakyTestCount} flaky tests to improve reliability`);
     }
-    
+
     return recommendations;
   },
-  
+
   /**
    * Get release risk history for a project
    */

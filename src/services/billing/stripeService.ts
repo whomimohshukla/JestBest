@@ -57,23 +57,23 @@ export const stripeService = {
       [`payment_settings[save_default_payment_method]`]: 'on_subscription',
       [`expand[0]`]: 'latest_invoice.payment_intent',
     });
-    
+
     if (options?.trialDays) {
       body.set('trial_period_days', String(options.trialDays));
     }
-    
+
     if (options?.coupon) {
       body.set('coupon', options.coupon);
     }
-    
+
     if (options?.metadata) {
       Object.entries(options.metadata).forEach(([key, value]) => {
         body.set(`metadata[${key}]`, value);
       });
     }
-    
+
     const result = await callStripe<any>('POST', '/subscriptions', body);
-    
+
     return {
       subscriptionId: result.id,
       clientSecret: result.latest_invoice?.payment_intent?.client_secret,
@@ -89,7 +89,7 @@ export const stripeService = {
       await callStripe<unknown>('POST', `/subscriptions/${subscriptionId}`, body);
     }
   },
-  
+
   async updateSubscription(
     subscriptionId: string,
     updates: {
@@ -99,56 +99,55 @@ export const stripeService = {
     }
   ): Promise<void> {
     const body = new URLSearchParams();
-    
+
     if (updates.priceId) {
       body.set(`items[0][price]`, updates.priceId);
       body.set('proration_behavior', 'always_invoice');
     }
-    
+
     if (updates.quantity) {
       body.set(`items[0][quantity]`, String(updates.quantity));
     }
-    
+
     if (updates.metadata) {
       Object.entries(updates.metadata).forEach(([key, value]) => {
         body.set(`metadata[${key}]`, value);
       });
     }
-    
+
     await callStripe<unknown>('POST', `/subscriptions/${subscriptionId}`, body);
   },
-  
+
   async createPaymentMethod(customerId: string, paymentMethodId: string): Promise<void> {
     const body = new URLSearchParams({
       payment_method: paymentMethodId,
     });
-    
+
     await callStripe<unknown>('POST', `/customers/${customerId}`, body);
   },
-  
+
   async getSubscription(subscriptionId: string): Promise<any> {
     return callStripe<any>('GET', `/subscriptions/${subscriptionId}`);
   },
-  
+
   async listInvoices(customerId: string, limit = 10): Promise<any[]> {
-    const response = await callStripe<{ data: any[] }>('GET', `/invoices?customer=${customerId}&limit=${limit}`);
+    const response = await callStripe<{ data: any[] }>(
+      'GET',
+      `/invoices?customer=${customerId}&limit=${limit}`
+    );
     return response.data;
   },
-  
-  async createUsageRecord(
-    subscriptionItemId: string,
-    quantity: number,
-    timestamp?: number
-  ): Promise<void> {
+
+  async createUsageRecord(subscriptionItemId: string, quantity: number, timestamp?: number): Promise<void> {
     const body = new URLSearchParams({
       quantity: String(quantity),
       timestamp: String(timestamp || Math.floor(Date.now() / 1000)),
       action: 'increment',
     });
-    
+
     await callStripe<unknown>('POST', `/subscription_items/${subscriptionItemId}/usage_records`, body);
   },
-  
+
   async createCheckoutSession(params: {
     customerId: string;
     priceId: string;
@@ -164,29 +163,29 @@ export const stripeService = {
       success_url: params.successUrl,
       cancel_url: params.cancelUrl,
     });
-    
+
     if (params.trialDays) {
       body.set('subscription_data[trial_period_days]', String(params.trialDays));
     }
-    
+
     const result = await callStripe<{ id: string; url: string }>('POST', '/checkout/sessions', body);
-    
+
     return {
       sessionId: result.id,
       url: result.url,
     };
   },
-  
+
   async createPortalSession(customerId: string, returnUrl: string): Promise<{ url: string }> {
     const body = new URLSearchParams({
       customer: customerId,
       return_url: returnUrl,
     });
-    
+
     const result = await callStripe<{ url: string }>('POST', '/billing_portal/sessions', body);
     return { url: result.url };
   },
-  
+
   /**
    * Verify a Stripe webhook signature and return the parsed event.
    *
@@ -219,9 +218,7 @@ export const stripeService = {
       throw new UnauthorizedError('Stripe signature timestamp is outside the tolerance window');
     }
 
-    const expected = createHmac('sha256', secret)
-      .update(`${timestamp}.${payload}`, 'utf8')
-      .digest('hex');
+    const expected = createHmac('sha256', secret).update(`${timestamp}.${payload}`, 'utf8').digest('hex');
     const matches = received.some(
       (candidate) =>
         candidate.length === expected.length && timingSafeEqual(Buffer.from(candidate), Buffer.from(expected))

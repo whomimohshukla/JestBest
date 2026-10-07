@@ -160,7 +160,11 @@ export const testCaseService = {
     return toApiSuite(await testCaseService.getSuite(suiteId));
   },
 
-  async listSuites(projectId: string, page = 1, pageSize = 20): Promise<ListResponse<ReturnType<typeof toApiSuite>>> {
+  async listSuites(
+    projectId: string,
+    page = 1,
+    pageSize = 20
+  ): Promise<ListResponse<ReturnType<typeof toApiSuite>>> {
     const skip = (page - 1) * pageSize;
     const [items, total] = await Promise.all([
       testCaseRepository.listSuites(projectId, skip, pageSize),

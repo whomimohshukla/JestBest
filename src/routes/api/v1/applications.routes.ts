@@ -33,11 +33,7 @@ router.post(
   validate(createApplicationSchema),
   createApplication
 );
-router.get(
-  '/',
-  requirePermission(Permissions.APPLICATION_READ),
-  listApplications
-);
+router.get('/', requirePermission(Permissions.APPLICATION_READ), listApplications);
 router.get(
   '/:applicationId/map',
   requirePermission(Permissions.APPLICATION_READ),

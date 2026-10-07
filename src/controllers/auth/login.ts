@@ -20,9 +20,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       },
       req
     );
-    res.status(200).json(
-      ok(result, { message: 'Please verify your email before continuing.' })
-    );
+    res.status(200).json(ok(result, { message: 'Please verify your email before continuing.' }));
     return;
   }
 

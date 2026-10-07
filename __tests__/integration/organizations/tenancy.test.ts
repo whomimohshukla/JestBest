@@ -51,24 +51,18 @@ describe('cross-tenant isolation on /organizations', () => {
   });
 
   it('GET /organizations/:id — allows reading your own org', async () => {
-    const res = await api
-      .get(`${API}/organizations/${attacker.organizationId}`)
-      .set(auth(attacker));
+    const res = await api.get(`${API}/organizations/${attacker.organizationId}`).set(auth(attacker));
     expect(res.status).toBe(200);
     expect(res.body.data.id).toBe(attacker.organizationId);
   });
 
   it('GET /organizations/:id/members — blocks reading another org roster', async () => {
-    const res = await api
-      .get(`${API}/organizations/${victim.organizationId}/members`)
-      .set(auth(attacker));
+    const res = await api.get(`${API}/organizations/${victim.organizationId}/members`).set(auth(attacker));
     expect(res.status).toBe(403);
   });
 
   it('GET /organizations/:id/audit-logs — blocks reading another org audit trail', async () => {
-    const res = await api
-      .get(`${API}/organizations/${victim.organizationId}/audit-logs`)
-      .set(auth(attacker));
+    const res = await api.get(`${API}/organizations/${victim.organizationId}/audit-logs`).set(auth(attacker));
     expect(res.status).toBe(403);
   });
 
@@ -135,19 +129,14 @@ describe('x-org-id header handling', () => {
   });
 
   it('is ignored for an unknown organization', async () => {
-    const res = await api
-      .get(`${API}/projects`)
-      .set({ ...auth(attacker), 'x-org-id': 'org_does_not_exist' });
+    const res = await api.get(`${API}/projects`).set({ ...auth(attacker), 'x-org-id': 'org_does_not_exist' });
     expect(res.status).toBe(403);
   });
 });
 
 describe('project isolation', () => {
-  it('does not expose another organization\'s project', async () => {
-    const created = await api
-      .post(`${API}/projects`)
-      .set(auth(victim))
-      .send({ name: 'Victim Project' });
+  it("does not expose another organization's project", async () => {
+    const created = await api.post(`${API}/projects`).set(auth(victim)).send({ name: 'Victim Project' });
     expect(created.status).toBe(201);
     const projectId = created.body.data.id as string;
 

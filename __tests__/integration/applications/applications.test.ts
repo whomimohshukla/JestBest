@@ -57,9 +57,7 @@ afterAll(async () => {
 
 describe('application scan status', () => {
   it('returns the scan for the owning organization', async () => {
-    const response = await api
-      .get(`${API}/applications/${applicationId}/scan/${scanId}`)
-      .set(auth(user));
+    const response = await api.get(`${API}/applications/${applicationId}/scan/${scanId}`).set(auth(user));
 
     expect(response.status).toBe(200);
     expect(response.body.data.id).toBe(scanId);
@@ -74,9 +72,7 @@ describe('application scan status', () => {
   it("refuses a scan lookup for another organization's application", async () => {
     const outsider = await createTestUser(api, { organizationName: 'Other Org' });
 
-    const response = await api
-      .get(`${API}/applications/${applicationId}/scan/${scanId}`)
-      .set(auth(outsider));
+    const response = await api.get(`${API}/applications/${applicationId}/scan/${scanId}`).set(auth(outsider));
 
     expect(response.status).toBe(403);
   });

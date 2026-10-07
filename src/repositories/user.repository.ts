@@ -26,7 +26,7 @@ export const userRepository = {
       take,
       orderBy: { createdAt: 'desc' },
     }),
-  
+
   async findOrCreateFromOAuth(profile: OAuthUserProfile) {
     // Try to find existing user by email
     let user = await prisma.user.findFirst({
@@ -35,7 +35,7 @@ export const userRepository = {
         deletedAt: null,
       },
     });
-    
+
     if (user) {
       // Update avatar if not set
       if (!user.avatar && profile.avatar) {
@@ -44,7 +44,7 @@ export const userRepository = {
           data: { avatar: profile.avatar },
         });
       }
-      
+
       // Mark email as verified if OAuth login
       if (!user.emailVerified) {
         user = await prisma.user.update({
@@ -52,10 +52,10 @@ export const userRepository = {
           data: { emailVerified: new Date() },
         });
       }
-      
+
       return user;
     }
-    
+
     // Create new user
     return prisma.user.create({
       data: {

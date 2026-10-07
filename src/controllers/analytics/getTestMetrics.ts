@@ -19,9 +19,7 @@ export const getTestMetrics = async (req: Request, res: Response): Promise<void>
     }
   }
 
-  const where = projectId
-    ? { projectId }
-    : { project: { organizationId: req.orgId } };
+  const where = projectId ? { projectId } : { project: { organizationId: req.orgId } };
   const result = await metricsService.getTestMetrics(where, timeframe);
   res.status(200).json(ok(result));
 };

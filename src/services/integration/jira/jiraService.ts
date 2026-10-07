@@ -70,7 +70,7 @@ export const jiraService = {
       issueUrl: `${jira.domain}/browse/${issue.key}`.replace(/^https?:\/\//, 'https://'),
     };
   },
-  
+
   async createBugIssue(
     config: IntegrationConfig,
     bug: {
@@ -87,19 +87,17 @@ export const jiraService = {
     projectKey: string
   ): Promise<{ issueKey: string; issueUrl: string }> {
     const jira = getConfig(config);
-    
+
     // Format reproduction steps
     let reproSteps = '';
     if (bug.reproductionSteps) {
       if (Array.isArray(bug.reproductionSteps)) {
-        reproSteps = bug.reproductionSteps
-          .map((step: any) => `# ${step.action || step}`)
-          .join('\n');
+        reproSteps = bug.reproductionSteps.map((step: any) => `# ${step.action || step}`).join('\n');
       } else if (typeof bug.reproductionSteps === 'string') {
         reproSteps = bug.reproductionSteps;
       }
     }
-    
+
     // Build Jira description in Atlassian Document Format (ADF)
     const description = {
       type: 'doc',
@@ -131,7 +129,7 @@ export const jiraService = {
         },
       ],
     };
-    
+
     if (reproSteps) {
       description.content.push(
         {
@@ -145,7 +143,7 @@ export const jiraService = {
         }
       );
     }
-    
+
     if (bug.expectedBehavior) {
       description.content.push(
         {
@@ -159,7 +157,7 @@ export const jiraService = {
         }
       );
     }
-    
+
     if (bug.actualBehavior) {
       description.content.push(
         {
@@ -173,7 +171,7 @@ export const jiraService = {
         }
       );
     }
-    
+
     // Map severity to Jira priority
     const priorityMap: Record<string, string> = {
       CRITICAL: 'Highest',
@@ -181,7 +179,7 @@ export const jiraService = {
       MEDIUM: 'Medium',
       LOW: 'Low',
     };
-    
+
     const response = await fetch(`https://${jira.domain}/rest/api/3/issue`, {
       method: 'POST',
       headers: {
@@ -199,19 +197,19 @@ export const jiraService = {
         },
       }),
     });
-    
+
     if (!response.ok) {
       const text = await response.text().catch(() => '');
       throw new UpstreamError(`Jira failed to create issue (${response.status})`, text.slice(0, 500));
     }
-    
+
     const issue = (await response.json()) as { key: string; self: string };
     return {
       issueKey: issue.key,
       issueUrl: `https://${jira.domain}/browse/${issue.key}`,
     };
   },
-  
+
   async updateIssue(
     config: IntegrationConfig,
     issueKey: string,
@@ -222,7 +220,7 @@ export const jiraService = {
     }
   ): Promise<void> {
     const jira = getConfig(config);
-    
+
     if (update.comment) {
       await fetch(`https://${jira.domain}/rest/api/3/issue/${issueKey}/comment`, {
         method: 'POST',
@@ -244,11 +242,11 @@ export const jiraService = {
         }),
       });
     }
-    
+
     if (update.status || update.assignee) {
       const fields: any = {};
       if (update.assignee) fields.assignee = { accountId: update.assignee };
-      
+
       await fetch(`https://${jira.domain}/rest/api/3/issue/${issueKey}`, {
         method: 'PUT',
         headers: {
@@ -259,7 +257,7 @@ export const jiraService = {
       });
     }
   },
-  
+
   async listProjects(config: IntegrationConfig): Promise<Array<{ key: string; name: string }>> {
     const jira = getConfig(config);
     const response = await fetch(`https://${jira.domain}/rest/api/3/project`, {
@@ -267,11 +265,11 @@ export const jiraService = {
         Authorization: `Basic ${Buffer.from(`${jira.email}:${jira.apiToken}`).toString('base64')}`,
       },
     });
-    
+
     if (!response.ok) {
       throw new UpstreamError(`Failed to list Jira projects (${response.status})`);
     }
-    
+
     const projects = (await response.json()) as Array<{ key: string; name: string }>;
     return projects;
   },

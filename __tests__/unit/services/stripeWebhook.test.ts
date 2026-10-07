@@ -66,13 +66,9 @@ describe('stripeService.handleWebhook signature verification', () => {
 
   it('rejects a malformed header', async () => {
     const payload = JSON.stringify({ id: 'evt_1' });
-    await expect(stripeService.handleWebhook(payload, 'garbage')).rejects.toThrow(
-      /malformed/i
-    );
+    await expect(stripeService.handleWebhook(payload, 'garbage')).rejects.toThrow(/malformed/i);
     await expect(stripeService.handleWebhook(payload, 't=abc,v1=def')).rejects.toThrow(/malformed/i);
-    await expect(stripeService.handleWebhook(payload, `v1=${'0'.repeat(64)}`)).rejects.toThrow(
-      /malformed/i
-    );
+    await expect(stripeService.handleWebhook(payload, `v1=${'0'.repeat(64)}`)).rejects.toThrow(/malformed/i);
   });
 
   it('rejects a truncated or padded signature without throwing on length mismatch', async () => {
@@ -82,9 +78,9 @@ describe('stripeService.handleWebhook signature verification', () => {
     const digest = valid.split('v1=')[1];
 
     // Shorter digest must not crash timingSafeEqual on unequal lengths.
-    await expect(stripeService.handleWebhook(payload, `t=${timestamp},v1=${digest.slice(0, 10)}`)).rejects.toThrow(
-      /signature verification failed/i
-    );
+    await expect(
+      stripeService.handleWebhook(payload, `t=${timestamp},v1=${digest.slice(0, 10)}`)
+    ).rejects.toThrow(/signature verification failed/i);
   });
 
   it('accepts a header carrying multiple v1 candidates (key rotation)', async () => {

@@ -19,7 +19,14 @@ export const raiseOnGithub = async (req: Request, res: Response): Promise<void> 
   }
 
   if (bug.githubIssueUrl) {
-    res.status(200).json(ok({ ...bug, githubIssueUrl: bug.githubIssueUrl }, { message: 'Bug is already linked to a GitHub issue.' }));
+    res
+      .status(200)
+      .json(
+        ok(
+          { ...bug, githubIssueUrl: bug.githubIssueUrl },
+          { message: 'Bug is already linked to a GitHub issue.' }
+        )
+      );
     return;
   }
 
@@ -27,16 +34,22 @@ export const raiseOnGithub = async (req: Request, res: Response): Promise<void> 
   // a bug is never filed into an unrelated project's repository.
   const integration = await integrationRepository.findForProject(req.orgId, 'GITHUB', bug.projectId);
   if (!integration) {
-    throw new NotFoundError('GitHub is not connected for this organization. Connect GitHub under Integrations first.');
+    throw new NotFoundError(
+      'GitHub is not connected for this organization. Connect GitHub under Integrations first.'
+    );
   }
 
   const config = integrationConfigOf(integration);
   if (!config.token) {
-    throw new BadRequestError('GitHub integration is missing an access token. Reconnect it from Integrations.');
+    throw new BadRequestError(
+      'GitHub integration is missing an access token. Reconnect it from Integrations.'
+    );
   }
   const repository = config.repository;
   if (!repository) {
-    throw new BadRequestError('GitHub integration has no default repository. Set the repository field under Integrations → GitHub.');
+    throw new BadRequestError(
+      'GitHub integration has no default repository. Set the repository field under Integrations → GitHub.'
+    );
   }
 
   const { issueUrl } = await githubService.createBugIssue(

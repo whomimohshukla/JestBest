@@ -1,5 +1,9 @@
 import { createTestCaseSchema } from '../../../src/validators/testCase.validator';
-import { runTestsSchema, scheduleTestRunSchema, addSuiteItemSchema } from '../../../src/validators/testRun.validator';
+import {
+  runTestsSchema,
+  scheduleTestRunSchema,
+  addSuiteItemSchema,
+} from '../../../src/validators/testRun.validator';
 import { createBugSchema, changeBugStatusSchema } from '../../../src/validators/bug.validator';
 import { createWebhookSchema } from '../../../src/validators/webhook.validator';
 import { triggerAgentSchema } from '../../../src/validators/agent.validator';
@@ -31,9 +35,7 @@ describe('createTestCaseSchema', () => {
   });
 
   it('rejects an uppercase priority', () => {
-    expect(issueKeys(createTestCaseSchema.safeParse({ ...valid, priority: 'HIGH' }))).toContain(
-      'priority'
-    );
+    expect(issueKeys(createTestCaseSchema.safeParse({ ...valid, priority: 'HIGH' }))).toContain('priority');
   });
 
   it('requires a known step action', () => {
@@ -70,15 +72,15 @@ describe('runTestsSchema', () => {
   });
 
   it('rejects an unknown trigger type', () => {
-    expect(
-      issueKeys(runTestsSchema.safeParse({ projectId: 'p1', triggerType: 'HOURLY' }))
-    ).toContain('triggerType');
+    expect(issueKeys(runTestsSchema.safeParse({ projectId: 'p1', triggerType: 'HOURLY' }))).toContain(
+      'triggerType'
+    );
   });
 
   it('rejects empty-string test case ids', () => {
-    expect(
-      issueKeys(runTestsSchema.safeParse({ projectId: 'p1', testCaseIds: [''] }))
-    ).toContain('testCaseIds.0');
+    expect(issueKeys(runTestsSchema.safeParse({ projectId: 'p1', testCaseIds: [''] }))).toContain(
+      'testCaseIds.0'
+    );
   });
 });
 
@@ -143,7 +145,13 @@ describe('createWebhookSchema', () => {
 
   it('requires a caller-supplied secret to be long enough', () => {
     expect(
-      issueKeys(createWebhookSchema.safeParse({ url: 'https://a.dev/h', eventTypes: ['TEST_COMPLETED'], secret: 'short' }))
+      issueKeys(
+        createWebhookSchema.safeParse({
+          url: 'https://a.dev/h',
+          eventTypes: ['TEST_COMPLETED'],
+          secret: 'short',
+        })
+      )
     ).toContain('secret');
   });
 });

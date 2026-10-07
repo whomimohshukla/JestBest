@@ -38,10 +38,7 @@ describe('agent trigger validation', () => {
   it.each(['EXECUTION', 'REPORT_AGENT'])(
     'rejects the unimplemented agent type %s with 400 instead of 500',
     async (agentType) => {
-      const response = await api
-        .post(`${API}/agents/trigger`)
-        .set(auth(user))
-        .send({ agentType });
+      const response = await api.post(`${API}/agents/trigger`).set(auth(user)).send({ agentType });
 
       expect(response.status).toBe(400);
       expect(response.status).not.toBe(500);
@@ -52,10 +49,7 @@ describe('agent trigger validation', () => {
   it.each(['EXPLORER', 'TEST_GENERATOR', 'FAILURE_ANALYZER', 'BUG_AGENT'])(
     'still accepts the implemented agent type %s',
     async (agentType) => {
-      const response = await api
-        .post(`${API}/agents/trigger`)
-        .set(auth(user))
-        .send({ agentType });
+      const response = await api.post(`${API}/agents/trigger`).set(auth(user)).send({ agentType });
 
       expect(response.status).toBe(201);
     }

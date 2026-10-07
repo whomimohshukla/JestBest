@@ -73,7 +73,11 @@ export const knowledgeService = {
     }
   },
 
-  async retrieveSimilar(input: { organizationId: string; query: string; limit?: number }): Promise<SimilarIncident[]> {
+  async retrieveSimilar(input: {
+    organizationId: string;
+    query: string;
+    limit?: number;
+  }): Promise<SimilarIncident[]> {
     if (!knowledgeService.isEnabled()) return [];
 
     const query = (input.query ?? '').trim();

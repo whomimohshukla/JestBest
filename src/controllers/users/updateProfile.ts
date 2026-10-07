@@ -34,6 +34,10 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
         : [],
     };
   }
-  const profile = await userService.updateProfile(req.user.id, { name, avatar, notificationPreferences: prefs });
+  const profile = await userService.updateProfile(req.user.id, {
+    name,
+    avatar,
+    notificationPreferences: prefs,
+  });
   res.status(200).json(ok(profile));
 };

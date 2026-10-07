@@ -134,9 +134,7 @@ export const createTestUser = async (
   }
 
   const verificationToken = register.body.data.verificationToken as string;
-  const verify = await api
-    .post('/api/v1/auth/verify-email')
-    .send({ token: verificationToken });
+  const verify = await api.post('/api/v1/auth/verify-email').send({ token: verificationToken });
   if (verify.status !== 200) {
     throw new Error(`verify-email failed: ${verify.status} ${JSON.stringify(verify.body)}`);
   }

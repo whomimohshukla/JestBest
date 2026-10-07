@@ -48,7 +48,7 @@ export const slackService = {
       throw new UpstreamError(`Slack message failed: ${data.error ?? 'unknown error'}`);
     }
   },
-  
+
   async postBlockMessage(
     config: IntegrationConfig,
     blocks: any[],
@@ -60,7 +60,7 @@ export const slackService = {
     if (!targetChannel) {
       throw new UpstreamError('Slack channel is not configured.');
     }
-    
+
     const response = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: {
@@ -73,13 +73,13 @@ export const slackService = {
         blocks,
       }),
     });
-    
+
     const data = (await response.json()) as { ok?: boolean; error?: string };
     if (!data.ok) {
       throw new UpstreamError(`Slack message failed: ${data.error ?? 'unknown error'}`);
     }
   },
-  
+
   async sendTestFailureNotification(
     config: IntegrationConfig,
     notification: {
@@ -130,7 +130,9 @@ export const slackService = {
           text: `*Failed Tests:*\n${notification.failedTests
             .slice(0, 5)
             .map((t) => `• ${t.title}`)
-            .join('\n')}${notification.failedTests.length > 5 ? `\n_...and ${notification.failedTests.length - 5} more_` : ''}`,
+            .join(
+              '\n'
+            )}${notification.failedTests.length > 5 ? `\n_...and ${notification.failedTests.length - 5} more_` : ''}`,
         },
       },
       {
@@ -149,7 +151,7 @@ export const slackService = {
         ],
       },
     ];
-    
+
     await this.postBlockMessage(
       config,
       blocks,
@@ -157,7 +159,7 @@ export const slackService = {
       channel
     );
   },
-  
+
   async sendTestSuccessNotification(
     config: IntegrationConfig,
     notification: {
@@ -215,15 +217,10 @@ export const slackService = {
         ],
       },
     ];
-    
-    await this.postBlockMessage(
-      config,
-      blocks,
-      `All tests passed in ${notification.projectName}`,
-      channel
-    );
+
+    await this.postBlockMessage(config, blocks, `All tests passed in ${notification.projectName}`, channel);
   },
-  
+
   async sendBugNotification(
     config: IntegrationConfig,
     notification: {
@@ -236,13 +233,14 @@ export const slackService = {
     },
     channel?: string
   ): Promise<void> {
-    const severityEmoji = {
-      CRITICAL: '🔴',
-      HIGH: '🟠',
-      MEDIUM: '🟡',
-      LOW: '🟢',
-    }[notification.severity] || '⚪';
-    
+    const severityEmoji =
+      {
+        CRITICAL: '🔴',
+        HIGH: '🟠',
+        MEDIUM: '🟡',
+        LOW: '🟢',
+      }[notification.severity] || '⚪';
+
     const blocks = [
       {
         type: 'header',
@@ -292,7 +290,7 @@ export const slackService = {
         ],
       },
     ];
-    
+
     await this.postBlockMessage(
       config,
       blocks,
@@ -300,7 +298,7 @@ export const slackService = {
       channel
     );
   },
-  
+
   async sendDailySummary(
     config: IntegrationConfig,
     summary: {
@@ -314,10 +312,8 @@ export const slackService = {
     },
     channel?: string
   ): Promise<void> {
-    const passRate = summary.testsRun > 0 
-      ? Math.round((summary.testsPassed / summary.testsRun) * 100) 
-      : 0;
-    
+    const passRate = summary.testsRun > 0 ? Math.round((summary.testsPassed / summary.testsRun) * 100) : 0;
+
     const blocks = [
       {
         type: 'header',
@@ -356,7 +352,7 @@ export const slackService = {
         ],
       },
     ];
-    
+
     if (summary.topFailingTests.length > 0) {
       blocks.push({
         type: 'section',
@@ -369,7 +365,7 @@ export const slackService = {
         },
       });
     }
-    
+
     await this.postBlockMessage(
       config,
       blocks,

@@ -47,7 +47,9 @@ describe('POST /api-keys', () => {
     expect(res.body.data).not.toHaveProperty('key');
 
     // The plaintext is returned once, on creation. Its hash must never appear.
-    const hash = createHash('sha256').update(res.body.data.plainKey as string).digest('hex');
+    const hash = createHash('sha256')
+      .update(res.body.data.plainKey as string)
+      .digest('hex');
     expect(JSON.stringify(res.body)).not.toContain(hash);
   });
 
@@ -100,7 +102,9 @@ describe('API key authentication', () => {
     const created = await api.post(`${API}/api-keys`).set(auth(user)).send(newKey('Wrong org'));
     const plainKey = created.body.data.plainKey as string;
 
-    const res = await api.get(`${API}/users/me`).set({ 'x-api-key': plainKey, 'x-org-id': other.organizationId });
+    const res = await api
+      .get(`${API}/users/me`)
+      .set({ 'x-api-key': plainKey, 'x-org-id': other.organizationId });
     // 401 (not 403) so the response does not confirm that the org exists.
     expect(res.status).toBe(401);
   });

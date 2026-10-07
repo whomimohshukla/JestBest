@@ -28,7 +28,13 @@ export interface FailureAnalyzerOutput {
 
 const buildPrompt = (
   input: FailureAnalyzerInput,
-  similar: Array<{ title: string; errorMessage: string | null; rootCause: string | null; suggestedFix: string | null; similarity: number }> = []
+  similar: Array<{
+    title: string;
+    errorMessage: string | null;
+    rootCause: string | null;
+    suggestedFix: string | null;
+    similarity: number;
+  }> = []
 ): LlmMessage[] => {
   const systemRead =
     'You are an expert QA failure analysis agent. Analyze the test failure data and produce a precise root-cause analysis as JSON with keys: rootCause, category, confidence, evidence, suggestedFix, relatedSelectors.';

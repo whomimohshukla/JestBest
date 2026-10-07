@@ -16,13 +16,13 @@ export const createRateLimiter = (
     max: options.max ?? env.RATE_LIMIT_MAX,
     standardHeaders: true,
     legacyHeaders: false,
-      message: {
-        success: false,
-        error: {
-          code: options.code ?? 'RATE_LIMITED',
-          message: options.message ?? Messages.AUTH.RATE_LIMITED,
-        },
+    message: {
+      success: false,
+      error: {
+        code: options.code ?? 'RATE_LIMITED',
+        message: options.message ?? Messages.AUTH.RATE_LIMITED,
       },
+    },
   });
 };
 

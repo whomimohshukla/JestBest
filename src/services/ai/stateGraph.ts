@@ -53,7 +53,11 @@ export class StateGraphBuilder<State extends GraphState> {
     return this;
   }
 
-  addConditionalEdges(from: NodeId, condition: (state: State) => string, routes: Record<string, NodeId>): this {
+  addConditionalEdges(
+    from: NodeId,
+    condition: (state: State) => string,
+    routes: Record<string, NodeId>
+  ): this {
     this.edges.push({ from, condition, routes });
     return this;
   }
@@ -74,7 +78,10 @@ export class StateGraphBuilder<State extends GraphState> {
       throw new StateGraphError(`Start node "${start}" is not registered.`);
     }
 
-    const adjacency = new Map<NodeId, { condition?: (state: State) => string; routes: Record<string, NodeId>; to?: NodeId }>();
+    const adjacency = new Map<
+      NodeId,
+      { condition?: (state: State) => string; routes: Record<string, NodeId>; to?: NodeId }
+    >();
     for (const edge of this.edges) {
       if (edge.condition) {
         adjacency.set(edge.from, { condition: edge.condition, routes: edge.routes });

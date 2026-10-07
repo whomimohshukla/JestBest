@@ -17,7 +17,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
   // authService.register already sent the verification email (it owns the
   // token). Do not send a second, link-less welcome email here -- that was
   // both redundant and the reason the only "welcome" mail had no verify link.
-  
+
   await auditService.log(
     {
       organizationId: result.organization.id,

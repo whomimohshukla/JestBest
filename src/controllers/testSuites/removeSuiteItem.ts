@@ -16,5 +16,7 @@ export const removeSuiteItem = async (req: Request, res: Response): Promise<void
     throw new ForbiddenError(Messages.AUTH.FORBIDDEN);
   }
   await testCaseService.removeSuiteItem(testSuiteId, suiteItemId);
-  res.status(200).json(ok(await testCaseService.getApiSuite(testSuiteId), { message: Messages.TEST.UPDATED }));
+  res
+    .status(200)
+    .json(ok(await testCaseService.getApiSuite(testSuiteId), { message: Messages.TEST.UPDATED }));
 };

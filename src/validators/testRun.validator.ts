@@ -35,9 +35,7 @@ export const listTestRunsQuerySchema = z.object({
   projectId: z.string().optional(),
   // The UI filter list includes QUEUED, which is not in the TestStatus enum but
   // was previously rejected with a 400. Accept and coerce it to PENDING.
-  status: z
-    .enum(['PENDING', 'QUEUED', 'RUNNING', 'PASSED', 'FAILED', 'SKIPPED', 'CANCELLED'])
-    .optional(),
+  status: z.enum(['PENDING', 'QUEUED', 'RUNNING', 'PASSED', 'FAILED', 'SKIPPED', 'CANCELLED']).optional(),
 });
 
 export const listTestSuitesQuerySchema = z.object({

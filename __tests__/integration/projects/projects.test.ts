@@ -28,7 +28,7 @@ afterAll(async () => {
 });
 
 describe('POST /projects', () => {
-  it('creates a project owned by the caller\'s organization', async () => {
+  it("creates a project owned by the caller's organization", async () => {
     const res = await api.post(`${API}/projects`).set(auth(user)).send(newProject('Checkout'));
 
     expect(res.status).toBe(201);
@@ -79,7 +79,10 @@ describe('GET /projects', () => {
 
   it('honours pageSize', async () => {
     for (let i = 0; i < 3; i++) {
-      await api.post(`${API}/projects`).set(auth(user)).send(newProject(`P${i}`));
+      await api
+        .post(`${API}/projects`)
+        .set(auth(user))
+        .send(newProject(`P${i}`));
     }
     const res = await api.get(`${API}/projects?pageSize=2`).set(auth(user));
     expect(res.body.data.items).toHaveLength(2);
@@ -156,9 +159,7 @@ describe('PATCH /projects/:id/archive', () => {
     expect(list.body.data.items.map((p: { id: string }) => p.id)).not.toContain(id);
 
     // ...but is still retrievable when archived projects are explicitly requested.
-    const withArchived = await api
-      .get(`${API}/projects?includeArchived=true`)
-      .set(auth(user));
+    const withArchived = await api.get(`${API}/projects?includeArchived=true`).set(auth(user));
     expect(withArchived.body.data.items.map((p: { id: string }) => p.id)).toContain(id);
   });
 });

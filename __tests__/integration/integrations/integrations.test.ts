@@ -33,10 +33,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   await resetDatabase();
   user = await createTestUser(api);
-  const project = await api
-    .post(`${API}/projects`)
-    .set(auth(user))
-    .send({ name: 'Integration Project' });
+  const project = await api.post(`${API}/projects`).set(auth(user)).send({ name: 'Integration Project' });
   projectId = project.body.data.id as string;
 });
 
@@ -90,11 +87,7 @@ describe('GitHub integration resolution per project', () => {
     const orgWide = await seedGithub(user.organizationId, null, 'acme/default');
     const projectScoped = await seedGithub(user.organizationId, projectId, 'acme/specific');
 
-    const resolved = await integrationRepository.findForProject(
-      user.organizationId,
-      'GITHUB',
-      projectId
-    );
+    const resolved = await integrationRepository.findForProject(user.organizationId, 'GITHUB', projectId);
 
     expect(resolved?.id).toBe(projectScoped.id);
     expect(resolved?.id).not.toBe(orgWide.id);
@@ -103,11 +96,7 @@ describe('GitHub integration resolution per project', () => {
   it('falls back to the org-wide integration when the project has none', async () => {
     const orgWide = await seedGithub(user.organizationId, null, 'acme/default');
 
-    const resolved = await integrationRepository.findForProject(
-      user.organizationId,
-      'GITHUB',
-      projectId
-    );
+    const resolved = await integrationRepository.findForProject(user.organizationId, 'GITHUB', projectId);
 
     expect(resolved?.id).toBe(orgWide.id);
   });
@@ -116,11 +105,7 @@ describe('GitHub integration resolution per project', () => {
     const outsider = await createTestUser(api, { organizationName: 'Other Org' });
     const foreign = await seedGithub(outsider.organizationId, projectId, 'acme/foreign');
 
-    const resolved = await integrationRepository.findForProject(
-      user.organizationId,
-      'GITHUB',
-      projectId
-    );
+    const resolved = await integrationRepository.findForProject(user.organizationId, 'GITHUB', projectId);
 
     expect(resolved?.id ?? null).not.toBe(foreign.id);
     expect(resolved).toBeNull();
@@ -137,11 +122,7 @@ describe('GitHub integration resolution per project', () => {
       } as never,
     });
 
-    const resolved = await integrationRepository.findForProject(
-      user.organizationId,
-      'GITHUB',
-      projectId
-    );
+    const resolved = await integrationRepository.findForProject(user.organizationId, 'GITHUB', projectId);
 
     expect(resolved).toBeNull();
   });
