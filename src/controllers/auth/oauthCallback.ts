@@ -60,7 +60,7 @@ export const oauthCallback = async (req: Request, res: Response): Promise<void> 
     return;
   }
 
-  if (provider !== 'github') {
+  if (provider !== 'github' && provider !== 'google') {
     fail('unsupported_provider', `Provider '${provider}' is not supported`);
     return;
   }

@@ -15,6 +15,12 @@ process.env.JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'test-refresh
 process.env.ENCRYPTION_KEY =
   process.env.ENCRYPTION_KEY || 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 process.env.PORT = process.env.PORT || '4000';
+// Expose a Google OAuth client so the authorize route can be exercised
+// end-to-end (state issuance → provider URL) without hitting Google.
+process.env.GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'google-test-client-id.apps.googleusercontent.com';
+process.env.GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'google-test-client-secret';
+process.env.GOOGLE_OAUTH_CALLBACK_URL =
+  process.env.GOOGLE_OAUTH_CALLBACK_URL || 'http://localhost:4000/api/v1/auth/oauth/google/callback';
 
 // Rate limiting is a Redis-backed singleton shared across the whole test run, so
 // the production caps (20 auth attempts / 15 min) would fail the suite on

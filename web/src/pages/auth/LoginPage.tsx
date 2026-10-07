@@ -6,7 +6,7 @@ import { getErrorMessage } from '../../api/client';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Bot, Lock, Mail, ArrowRight, Zap, Bug, GitBranch, Database, CheckCircle2, AlertCircle } from 'lucide-react';
-import { GitHubIcon } from '../../components/ui/social-icons';
+import { GitHubIcon, GoogleIcon } from '../../components/ui/social-icons';
 
 const explainNodes = [
   { icon: Zap, label: 'Agent scans your app', note: 'discovers flows & edge cases', top: '4%', left: '2%' },
@@ -22,7 +22,7 @@ export default function LoginPage() {
   const [twoFactorToken, setTwoFactorToken] = useState<string | null>(null);
   const [twoFactorSetup, setTwoFactorSetup] = useState<{ secret: string; otpauthUrl: string; qrDataUrl: string } | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string; code?: string }>({});
   const navigate = useNavigate();
@@ -104,15 +104,15 @@ export default function LoginPage() {
     }
   };
 
-  const handleGithubLogin = async () => {
+  const handleOAuthLogin = async (provider: 'github' | 'google') => {
     if (oauthLoading) return;
-    setOauthLoading(true);
+    setOauthLoading(provider);
     try {
-      const { url } = await authApi.oauthAuthorize('github');
+      const { url } = await authApi.oauthAuthorize(provider);
       window.location.href = url;
     } catch (error) {
       toast.error(getErrorMessage(error));
-      setOauthLoading(false);
+      setOauthLoading(null);
     }
   };
 
@@ -323,14 +323,23 @@ export default function LoginPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-3">
-            <button type="button" onClick={handleGithubLogin} disabled={isLoading || oauthLoading}
+            <button type="button" onClick={() => handleOAuthLogin('github')} disabled={isLoading || oauthLoading !== null}
               className="flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-medium transition-colors border border-white/10 disabled:opacity-50">
-              {oauthLoading ? (
+              {oauthLoading === 'github' ? (
                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               ) : (
                 <GitHubIcon className="w-4 h-4" />
               )}
               Sign in with GitHub
+            </button>
+            <button type="button" onClick={() => handleOAuthLogin('google')} disabled={isLoading || oauthLoading !== null}
+              className="flex items-center justify-center gap-2 py-2.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm font-medium transition-colors border border-white/10 disabled:opacity-50">
+              {oauthLoading === 'google' ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <GoogleIcon className="w-4 h-4" />
+              )}
+              Sign in with Google
             </button>
           </div>
 

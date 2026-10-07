@@ -30,6 +30,14 @@ export const oauthService = {
           callbackUrl:
             env.GITHUB_OAUTH_CALLBACK_URL ?? `${env.API_ORIGIN}${env.API_PREFIX}/auth/oauth/github/callback`,
         };
+      case 'google':
+        if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) return null;
+        return {
+          clientId: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+          callbackUrl:
+            env.GOOGLE_OAUTH_CALLBACK_URL ?? `${env.API_ORIGIN}${env.API_PREFIX}/auth/oauth/google/callback`,
+        };
       default:
         return null;
     }
@@ -43,12 +51,14 @@ export const oauthService = {
     switch (provider) {
       case 'github':
         return `https://github.com/login/oauth/authorize?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.callbackUrl)}&scope=repo&state=${state}`;
+      case 'google':
+        return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.callbackUrl)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&prompt=select_account&state=${state}`;
       default:
         throw new UpstreamError(`${provider} OAuth is not supported yet`);
     }
   },
 
-  async exchangeCode(provider: 'github', code: string): Promise<OAuthUserProfile> {
+  async exchangeCode(provider: 'github' | 'google', code: string): Promise<OAuthUserProfile> {
     const config = oauthService.getProviderConfig(provider);
     if (!config) {
       throw new UpstreamError(`${provider} OAuth is not configured`);
@@ -57,6 +67,10 @@ export const oauthService = {
 
     if (provider === 'github') {
       return await oauthService.exchangeGitHubCode(code, config);
+    }
+
+    if (provider === 'google') {
+      return await oauthService.exchangeGoogleCode(code, config);
     }
 
     throw new UpstreamError(`${provider} OAuth exchange is not implemented`);
@@ -135,6 +149,59 @@ export const oauthService = {
       };
     } catch (error) {
       logger.error({ error, provider: 'github' }, 'GitHub OAuth exchange failed');
+      throw error;
+    }
+  },
+
+  async exchangeGoogleCode(code: string, config: OAuthProviderConfig): Promise<OAuthUserProfile> {
+    try {
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: config.clientId,
+          client_secret: config.clientSecret,
+          code,
+          redirect_uri: config.callbackUrl,
+          grant_type: 'authorization_code',
+        }),
+      });
+
+      if (!tokenResponse.ok) {
+        throw new UpstreamError('Failed to exchange Google code for token');
+      }
+
+      const tokenData = await tokenResponse.json();
+      const accessToken = tokenData.access_token;
+
+      if (!accessToken) {
+        throw new UpstreamError('No access token received from Google');
+      }
+
+      const userResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+
+      if (!userResponse.ok) {
+        throw new UpstreamError('Failed to fetch Google user information');
+      }
+
+      const user = await userResponse.json();
+
+      if (!user.email) {
+        throw new UpstreamError('Could not retrieve a verified email from your Google account');
+      }
+
+      logger.info({ email: user.email, provider: 'google' }, 'Google OAuth successful');
+
+      return {
+        providerUserId: String(user.sub),
+        email: user.email,
+        name: user.name || user.email.split('@')[0],
+        avatar: user.picture,
+      };
+    } catch (error) {
+      logger.error({ error, provider: 'google' }, 'Google OAuth exchange failed');
       throw error;
     }
   },

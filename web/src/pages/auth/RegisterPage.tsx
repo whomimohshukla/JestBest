@@ -10,7 +10,7 @@ import { Logo } from '../../components/Logo';
 import { Button } from '../../components/ui';
 import { Input } from '../../components/ui';
 import { FieldError } from '../../components/ui';
-import { GitHubIcon } from '../../components/ui/social-icons';
+import { GitHubIcon, GoogleIcon } from '../../components/ui/social-icons';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -21,7 +21,7 @@ export default function RegisterPage() {
   });
   const [errors, setErrors] = useState<Partial<Record<keyof typeof formData, string>>>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
@@ -64,15 +64,15 @@ export default function RegisterPage() {
     }
   };
 
-  const handleGithubLogin = async () => {
+  const handleOAuthLogin = async (provider: 'github' | 'google') => {
     if (oauthLoading) return;
-    setOauthLoading(true);
+    setOauthLoading(provider);
     try {
-      const { url } = await authApi.oauthAuthorize('github');
+      const { url } = await authApi.oauthAuthorize(provider);
       window.location.href = url;
     } catch (error) {
       toast.error(getErrorMessage(error));
-      setOauthLoading(false);
+      setOauthLoading(null);
     }
   };
 
@@ -269,16 +269,32 @@ export default function RegisterPage() {
               type="button"
               variant="outline"
               size="lg"
-              onClick={handleGithubLogin}
-              disabled={isLoading || oauthLoading}
+              onClick={() => handleOAuthLogin('github')}
+              disabled={isLoading || oauthLoading !== null}
               className="w-full"
             >
-              {oauthLoading ? (
+              {oauthLoading === 'github' ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-500/30 border-t-red-500" />
               ) : (
                 <GitHubIcon className="h-4 w-4" />
               )}
-              {oauthLoading ? 'Redirecting to GitHub…' : 'Continue with GitHub'}
+              {oauthLoading === 'github' ? 'Redirecting to GitHub…' : 'Continue with GitHub'}
+            </Button>
+
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={() => handleOAuthLogin('google')}
+              disabled={isLoading || oauthLoading !== null}
+              className="w-full"
+            >
+              {oauthLoading === 'google' ? (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-red-500/30 border-t-red-500" />
+              ) : (
+                <GoogleIcon className="h-4 w-4" />
+              )}
+              {oauthLoading === 'google' ? 'Redirecting to Google…' : 'Continue with Google'}
             </Button>
 
             <p className="mt-5 text-center text-sm text-muted-foreground">

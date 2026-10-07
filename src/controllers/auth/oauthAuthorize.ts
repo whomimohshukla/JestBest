@@ -5,7 +5,7 @@ import { ok } from '../../utils/formatters';
 import { getRedis } from '../../config/redis';
 import { randomBytes } from 'crypto';
 
-const SUPPORTED_PROVIDERS = new Set(['github']);
+const SUPPORTED_PROVIDERS = new Set(['github', 'google']);
 
 /** State is valid for the length of a typical provider round-trip. */
 const STATE_TTL_SECONDS = 10 * 60;
@@ -26,6 +26,6 @@ export const oauthAuthorize = async (req: Request, res: Response): Promise<void>
   // into signing in as the attacker's account.
   await getRedis().set(`oauth:state:${state}`, provider, 'EX', STATE_TTL_SECONDS);
 
-  const url = oauthService.getAuthorizationUrl(provider as 'github', state);
+  const url = oauthService.getAuthorizationUrl(provider as 'github' | 'google', state);
   res.status(200).json(ok({ url, state }));
 };

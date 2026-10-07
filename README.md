@@ -135,7 +135,8 @@ start** if a required variable is missing, so a typo fails loudly instead of at
 
 `CORS_ORIGINS` (comma-separated allowlist), `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (billing),
 `AWS_*` (S3 uploads for screenshots/videos), `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`
-(OAuth), and the `OPENAI_*` / `GEMINI_API_KEY` / `HUGGINGFACE_API_KEY` triplet.
+and `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (OAuth sign-in for GitHub and
+Google), and the `OPENAI_*` / `GEMINI_API_KEY` / `HUGGINGFACE_API_KEY` triplet.
 
 Outbound email is either `EMAIL_PROVIDER=sendgrid` (needs `SENDGRID_API_KEY`) or
 `EMAIL_PROVIDER=smtp`, which is handled by nodemailer and needs
@@ -1081,11 +1082,16 @@ the browser. The flow therefore splits the exchange:
    atomic `GETDEL` too, so the token works exactly once and two concurrent
    redemptions cannot both succeed (there is a test for exactly that race).
 
-Configuring `GITHUB_OAUTH_CALLBACK_URL` is the part that most often breaks this:
-it must point at the API's callback route, not at the SPA. A
-`/integrations/github/callback` path existed in `.env.example` and matched no
-route at all, so sign-in could never complete. `API_ORIGIN` provides the
-correct default (`${API_ORIGIN}${API_PREFIX}/auth/oauth/github/callback`).
+Configuring `GITHUB_OAUTH_CALLBACK_URL` (and `GOOGLE_OAUTH_CALLBACK_URL`) is
+the part that most often breaks this: each must point at the API's callback
+route, not at the SPA. A `/integrations/github/callback` path existed in
+`.env.example` and matched no route at all, so sign-in could never complete.
+`API_ORIGIN` provides the correct default
+(`${API_ORIGIN}${API_PREFIX}/auth/oauth/github/callback`, and the Google
+equivalent). GitHub and Google are the two providers wired into sign-in
+(`github` + `google`); the same callback serves both, and an OAuth login
+upserts a user by email, so an unknown email **registers** the account (sign-in
+and sign-up share one flow).
 
 The callback **requires** the state: a missing one fails with `missing_state`
 and an unknown/consumed one with `invalid_state`, both surfaced as an OAuth

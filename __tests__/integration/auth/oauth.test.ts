@@ -8,6 +8,7 @@ import {
   uniqueEmail,
 } from '../../fixtures/testApp';
 import { tokenService } from '../../../src/services/auth/tokenService';
+import { getRedis } from '../../../src/config/redis';
 
 const API = '/api/v1';
 
@@ -118,6 +119,35 @@ describe('GET /auth/oauth/:provider/authorize', () => {
 
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(res.body.success).toBe(false);
+  });
+
+  it('issues a Google consent URL with a single-use state', async () => {
+    // jest.setup.js configures GOOGLE_CLIENT_ID, so this exercises the real
+    // route: state is minted and persisted in Redis, then returned.
+    const res = await api.get(`${API}/auth/oauth/google/authorize`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    const url = res.body.data.url as string;
+    expect(url.startsWith('https://accounts.google.com/o/oauth2/v2/auth?')).toBe(true);
+    expect(url).toContain('client_id=google-test-client-id.apps.googleusercontent.com');
+    expect(url).toContain('response_type=code');
+    expect(url).toContain(`state=${res.body.data.state}`);
+
+    // The state is stored for the callback (GETDEL) bound to this provider and
+    // can be consumed exactly once.
+    const state = res.body.data.state as string;
+    const redemption = await getRedis().getdel(`oauth:state:${state}`);
+    expect(redemption).toBe('google');
+    expect(await getRedis().getdel(`oauth:state:${state}`)).toBeNull();
+  });
+
+  it('rejects github because no GITHUB_* secrets are configured in tests', async () => {
+    const res = await api.get(`${API}/auth/oauth/github/authorize`);
+
+    expect(res.status).toBe(502);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.message).toContain('not configured');
   });
 });
 
