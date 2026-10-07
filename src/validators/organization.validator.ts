@@ -38,5 +38,14 @@ export const memberParamsSchema = z.object({
   userId: z.string().min(1),
 });
 
+export const listAuditLogsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  // Coerced and capped: the controller did a bare `Number(pageSize)` with no
+  // upper bound, so `?pageSize=1000000` pulled an entire tenant's audit trail
+  // (plus its user joins) into a single response.
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  resourceType: z.string().max(64).optional(),
+});
+
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;

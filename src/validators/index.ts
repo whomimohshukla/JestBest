@@ -7,6 +7,7 @@ export {
   resetPasswordSchema,
   changePasswordSchema,
   verifyTwoFactorSchema,
+  oauthExchangeSchema,
   setupTwoFactorSchema,
   enableTwoFactorSchema,
   disableTwoFactorSchema,
@@ -22,6 +23,7 @@ export {
   updateMemberRoleSchema,
   getOrganizationParamsSchema,
   memberParamsSchema,
+  listAuditLogsQuerySchema,
   type CreateOrganizationInput,
   type InviteMemberInput,
 } from './organization.validator';
@@ -72,6 +74,7 @@ export {
   addBugCommentSchema,
   bugParamsSchema,
   listBugsQuerySchema,
+  listBugCommentsQuerySchema,
   type CreateBugInput,
 } from './bug.validator';
 export {

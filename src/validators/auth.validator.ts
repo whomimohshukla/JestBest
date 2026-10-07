@@ -49,7 +49,10 @@ export const enableTwoFactorSchema = z.object({
 
 export const disableTwoFactorSchema = z.object({
   password: z.string().min(1, 'Current password is required'),
-  code: z.string().regex(/^\d{6}$/, 'Verification code must be 6 digits').optional(),
+  code: z
+    .string()
+    .regex(/^\d{6}$/, 'Verification code must be 6 digits')
+    .optional(),
 });
 
 export const suspendAccountSchema = z.object({
@@ -59,3 +62,7 @@ export const suspendAccountSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
+
+export const oauthExchangeSchema = z.object({
+  exchangeToken: z.string().min(1),
+});

@@ -53,4 +53,11 @@ export const listBugsQuerySchema = z.object({
   severity: z.nativeEnum(BugSeverity).optional(),
 });
 
+export const listBugCommentsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  // This route parsed `Number(req.query.pageSize)` with no schema behind it, so
+  // `?pageSize=1000000` exported every comment on a bug in one response.
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+});
+
 export type CreateBugInput = z.infer<typeof createBugSchema>;
