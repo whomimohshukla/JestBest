@@ -34,10 +34,26 @@ export const authApi = {
    */
   oauthExchange: (exchangeToken: string) =>
     apiPost<AuthResult>('/auth/oauth/exchange', { exchangeToken }),
+  /**
+   * Move the session into another organization the account belongs to.
+   *
+   * The current refresh token travels with the request so the server can
+   * revoke it (rotation): the returned pair replaces it in storage, and the
+   * old workspace cannot be reached again by refreshing the previous pair.
+   */
+  switchOrganization: (organizationId: string) =>
+    apiPost<AuthResult>('/auth/switch-organization', {
+      organizationId,
+      refreshToken: localStorage.getItem('refreshToken') ?? undefined,
+    }),
   getMe: () => apiGet<User>('/users/me'),
 };
 
 export const organizationApi = {
+  /** Every organization the signed-in user is an active member of. */
+  listMine: () => apiGet<Organization[]>('/organizations'),
+  create: (data: { name: string; slug?: string }) =>
+    apiPost<Organization>('/organizations', data),
   get: (organizationId: string) =>
     apiGet<Organization>(`/organizations/${organizationId}`),
   update: (organizationId: string, data: Record<string, unknown>) =>

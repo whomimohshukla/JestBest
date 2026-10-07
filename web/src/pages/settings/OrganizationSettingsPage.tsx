@@ -5,6 +5,7 @@ import { organizationApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import { PageLoader, FieldError } from '../../components/ui';
+import { WorkspaceSwitcher } from '../../components/WorkspaceSwitcher';
 import { Building2, Loader2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -160,6 +161,8 @@ export default function OrganizationSettingsPage() {
           </div>
         </form>
       </div>
+
+      <WorkspaceSwitcher currentOrganizationId={orgId} />
     </motion.div>
   );
 }
