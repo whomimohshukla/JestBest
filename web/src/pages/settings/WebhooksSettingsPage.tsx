@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { webhooksApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
-import { PageLoader, Badge, FieldError , ButtonLoader } from '../../components/ui';
+import { PageLoader, Badge, FieldError, ButtonLoader, useConfirm } from '../../components/ui';
 import { WebhookDeliveries } from '../../components/WebhookDeliveries';
 import { ChevronDown, Plus, RefreshCw, Trash2, Webhook as WebhookIcon, Zap } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -23,6 +23,7 @@ const EVENT_OPTIONS: { value: WebhookEventType; label: string }[] = [
 
 export default function WebhooksSettingsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showModal, setShowModal] = useState(false);
   const [generatedSecret, setGeneratedSecret] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -113,10 +114,14 @@ export default function WebhooksSettingsPage() {
     createWebhookMutation.mutate(form);
   };
 
-  const handleDelete = (webhook: Webhook) => {
-    if (window.confirm(`Delete webhook ${webhook.url}?`)) {
-      deleteWebhookMutation.mutate(webhook.id);
-    }
+  const handleDelete = async (webhook: Webhook) => {
+    const ok = await confirm({
+      title: 'Delete webhook',
+      message: `Delete webhook ${webhook.url}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    deleteWebhookMutation.mutate(webhook.id);
   };
 
   return (

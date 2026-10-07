@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PopupViewport } from './components/ui/PopupViewport';
+import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { useAuthStore } from './store/authStore';
 import ErrorBoundary from './components/ErrorBoundary';
 import { PageLoader } from './components/ui';
@@ -118,6 +119,7 @@ function App() {
           </ErrorBoundary>
         </div>
         <PopupViewport />
+        <ConfirmDialog />
       </Router>
     </QueryClientProvider>
   );

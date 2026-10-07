@@ -15,7 +15,7 @@ import {
   PriorityBadge,
   InfoRow,
   Button,
-  ButtonLoader } from '../../components/ui';
+  ButtonLoader, useConfirm } from '../../components/ui';
 import {
   ArrowLeft,
   Trash2,
@@ -46,6 +46,7 @@ const getRelativeTime = (date: string) => {
 export default function BugDetailPage() {
   const { bugId } = useParams<{ bugId: string }>();
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [comment, setComment] = useState('');
   const queryClient = useQueryClient();
   const orgId = useAuthStore((s) => s.organization?.id);
@@ -124,10 +125,14 @@ export default function BugDetailPage() {
     addCommentMutation.mutate(comment.trim());
   };
 
-  const handleDelete = () => {
-    if (window.confirm(`Delete bug "${bug?.title}"?`)) {
-      deleteMutation.mutate(bugId as string);
-    }
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete bug',
+      message: `Delete bug "${bug?.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    deleteMutation.mutate(bugId as string);
   };
 
   const raiseGithubMutation = useMutation({

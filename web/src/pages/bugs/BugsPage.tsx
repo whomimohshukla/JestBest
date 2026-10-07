@@ -18,7 +18,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
-  HowToBox , ButtonLoader } from '../../components/ui';
+  HowToBox, ButtonLoader, useConfirm } from '../../components/ui';
 import { Plus, Search, Bug, Trash2, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Bug as BugType, BugSeverity, BugPriority } from '../../types';
@@ -27,6 +27,7 @@ const SEVERITIES: BugSeverity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'];
 const PRIORITIES: BugPriority[] = ['P0', 'P1', 'P2', 'P3'];
 
 export default function BugsPage() {
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('projectId') ?? '');
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,10 +101,14 @@ export default function BugsPage() {
     createBugMutation.mutate(newBug);
   };
 
-  const handleDelete = (bug: BugType) => {
-    if (window.confirm(`Delete bug "${bug.title}"?`)) {
-      deleteBugMutation.mutate(bug.id);
-    }
+  const handleDelete = async (bug: BugType) => {
+    const ok = await confirm({
+      title: 'Delete bug',
+      message: `Delete bug "${bug.title}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    deleteBugMutation.mutate(bug.id);
   };
 
   return (

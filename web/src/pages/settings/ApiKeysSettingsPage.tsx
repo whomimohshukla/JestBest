@@ -3,13 +3,14 @@ import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiKeysApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
-import { PageLoader, FieldError , ButtonLoader } from '../../components/ui';
+import { PageLoader, FieldError, ButtonLoader, useConfirm } from '../../components/ui';
 import { Copy, KeyRound, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { ApiKey } from '../../types';
 
 export default function ApiKeysSettingsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showModal, setShowModal] = useState(false);
   const [keyName, setKeyName] = useState('');
   const [keyNameError, setKeyNameError] = useState<string | null>(null);
@@ -62,10 +63,14 @@ export default function ApiKeysSettingsPage() {
     }
   };
 
-  const handleRevoke = (key: ApiKey) => {
-    if (window.confirm(`Revoke API key "${key.name}"? This cannot be undone.`)) {
-      revokeMutation.mutate(key.id);
-    }
+  const handleRevoke = async (key: ApiKey) => {
+    const ok = await confirm({
+      title: 'Revoke API key',
+      message: `Revoke API key "${key.name}"? This cannot be undone.`,
+      confirmLabel: 'Revoke',
+    });
+    if (!ok) return;
+    revokeMutation.mutate(key.id);
   };
 
   return (

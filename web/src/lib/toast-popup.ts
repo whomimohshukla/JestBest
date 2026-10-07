@@ -21,13 +21,22 @@ export const usePopupStore = create<PopupState>((set) => ({
 interface ToastOpts { id?: string; duration?: number; }
 
 /*
- * Popups render as centred dialogs that are dismissed deliberately, so they no
- * longer auto-close. `loading` is the exception: it stays until the caller
- * dismisses it or emits a terminal kind.
+ * Popups render as corner toasts. `success`/`info`/`warning` auto-dismiss after
+ * a per-kind duration (with a matching progress bar in the viewport);
+ * `error` hangs around a little longer so there is time to read the detail;
+ * `loading` stays until the caller dismisses it or emits a terminal kind.
  */
+export const DEFAULT_DURATIONS: Record<PopupKind, number> = {
+  success: 3500,
+  info: 4000,
+  warning: 5000,
+  error: 7000,
+  loading: 0,
+};
+
 function emit(kind: PopupKind, message: string, opts?: ToastOpts): string {
   const id = usePopupStore.getState().push(kind, message);
-  const d = opts?.duration ?? 0;
+  const d = opts?.duration ?? DEFAULT_DURATIONS[kind];
   if (d > 0) setTimeout(() => usePopupStore.getState().dismiss(id), d);
   return id;
 }

@@ -19,11 +19,12 @@ import {
   MinusCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { EmptyState, Select, PageLoader , ButtonLoader } from '../../components/ui';
+import { EmptyState, Select, PageLoader, ButtonLoader, useConfirm } from '../../components/ui';
 
 export default function TestSuitesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('projectId') ?? '');
@@ -270,10 +271,13 @@ export default function TestSuitesPage() {
                     Run
                   </button>
                   <button
-                    onClick={() => {
-                      if (window.confirm(`Delete test suite "${suite.name}"?`)) {
-                        deleteSuiteMutation.mutate(suite.id);
-                      }
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Delete test suite',
+                        message: `Delete test suite "${suite.name}"? This cannot be undone.`,
+                        confirmLabel: 'Delete',
+                      });
+                      if (ok) deleteSuiteMutation.mutate(suite.id);
                     }}
                     className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors text-red-500"
                   >

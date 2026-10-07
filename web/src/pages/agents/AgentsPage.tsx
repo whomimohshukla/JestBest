@@ -18,7 +18,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { PageLoader, EmptyState, Select, HowToBox } from '../../components/ui';
+import { PageLoader, EmptyState, Select, HowToBox, useConfirm } from '../../components/ui';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell , ButtonLoader, Spinner } from '../../components/ui';
 import type { AgentRun } from '../../types';
 import { hasActiveItems, pollWhileActive } from '../../lib/polling';
@@ -73,6 +73,7 @@ function AgentStatusBadge({ status }: { status: string }) {
 
 export default function AgentsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [showTriggerModal, setShowTriggerModal] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState('EXPLORER');
   const [selectedProject, setSelectedProject] = useState('');
@@ -303,10 +304,13 @@ export default function AgentsPage() {
                         </button>
                         {isCancelable(run) && (
                           <button
-                            onClick={() => {
-                              if (window.confirm(`Cancel agent run #${run.id.slice(0, 8)}?`)) {
-                                cancelRunMutation.mutate(run.id);
-                              }
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: 'Cancel agent run',
+                                message: `Cancel agent run #${run.id.slice(0, 8)}? Any findings will be discarded.`,
+                                confirmLabel: 'Cancel run',
+                              });
+                              if (ok) cancelRunMutation.mutate(run.id);
                             }}
                             disabled={cancelRunMutation.isPending}
                             className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors flex items-center gap-2 text-red-500 disabled:opacity-50"

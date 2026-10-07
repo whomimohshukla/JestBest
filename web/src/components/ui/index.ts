@@ -10,6 +10,8 @@ export { OfflineBanner } from './OfflineBanner';
 export { RunStatusBadge, BugStatusBadge, SeverityBadge, PriorityBadge, InfoRow } from './status';
 export { Select, type SelectProps } from './select';
 export { PopupViewport } from './PopupViewport';
+export { ConfirmDialog } from './ConfirmDialog';
+export { useConfirm } from '../../hooks/useConfirm';
 export { FieldError } from './field-error';
 export { HowToBox, FieldHint, type HowToStep } from './how-to';
 export * from './table';

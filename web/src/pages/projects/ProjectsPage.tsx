@@ -1,4 +1,4 @@
-import { ButtonLoader, Spinner, PageLoader } from '../../components/ui';
+import { ButtonLoader, Spinner, PageLoader, useConfirm } from '../../components/ui';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 
 export default function ProjectsPage() {
   const navigate = useNavigate();
+  const confirm = useConfirm();
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newProject, setNewProject] = useState({ name: '', description: '' });
@@ -205,10 +206,13 @@ export default function ProjectsPage() {
                     Open
                   </Link>
                   <button
-                    onClick={() => {
-                      if (window.confirm(`Archive project "${project.name}"?`)) {
-                        archiveProjectMutation.mutate(project.id);
-                      }
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Archive project',
+                        message: `Archive project "${project.name}"? It can be restored from settings later.`,
+                        confirmLabel: 'Archive',
+                      });
+                      if (ok) archiveProjectMutation.mutate(project.id);
                     }}
                     className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors"
                     title="Archive project"

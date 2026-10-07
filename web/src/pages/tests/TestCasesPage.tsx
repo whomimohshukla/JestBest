@@ -28,7 +28,7 @@ import {
   TableRow,
   TableHead,
   TableCell,
-  HowToBox , ButtonLoader } from '../../components/ui';
+  HowToBox, ButtonLoader, useConfirm } from '../../components/ui';
 import type { TestCase, TestCaseType } from '../../types';
 
 const TEST_TYPES: TestCaseType[] = ['FUNCTIONAL', 'HAPPY_PATH', 'NEGATIVE', 'EDGE_CASE', 'REGRESSION', 'SMOKE'];
@@ -67,6 +67,7 @@ const TYPE_COLORS: Record<string, string> = {
 
 export default function TestCasesPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
@@ -371,10 +372,13 @@ export default function TestCasesPage() {
                           <Archive className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => {
-                            if (window.confirm(`Delete test case "${testCase.title}"?`)) {
-                              deleteTestCaseMutation.mutate(testCase.id);
-                            }
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: 'Delete test case',
+                              message: `Delete test case "${testCase.title}"? This cannot be undone.`,
+                              confirmLabel: 'Delete',
+                            });
+                            if (ok) deleteTestCaseMutation.mutate(testCase.id);
                           }}
                           className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors text-red-500 flex items-center gap-1.5"
                           title="Delete"

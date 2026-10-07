@@ -218,3 +218,21 @@
   background-size: 200% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }
+
+/* Corner-toast lifecycle: the progress bar runs width 100%→0 over the toast's
+   auto-dismiss duration, and dismissal is driven by `animationend` so a pause
+   (hover) freezes the bar and the lifetime together. */
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+.toast-progress {
+  animation-name: toast-progress;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}

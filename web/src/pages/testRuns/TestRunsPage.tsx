@@ -21,7 +21,7 @@ import {
   EmptyState,
   PageLoader,
   HowToBox,
-  FieldError , ButtonLoader } from '../../components/ui';
+  FieldError, ButtonLoader, useConfirm } from '../../components/ui';
 import type { TestRun, TestCase } from '../../types';
 import { hasActiveItems, pollWhileActive } from '../../lib/polling';
 
@@ -34,6 +34,7 @@ export default function TestRunsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('projectId') ?? '');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -283,10 +284,13 @@ export default function TestRunsPage() {
                   <div className="flex gap-2 items-center lg:items-end">
                     {isCancelable(run) && (
                       <button
-                        onClick={() => {
-                          if (window.confirm(`Cancel run #${run.id.slice(0, 8)}?`)) {
-                            cancelRunMutation.mutate(run.id);
-                          }
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: 'Cancel test run',
+                            message: `Cancel run #${run.id.slice(0, 8)}? Any in-flight results will be discarded.`,
+                            confirmLabel: 'Cancel run',
+                          });
+                          if (ok) cancelRunMutation.mutate(run.id);
                         }}
                         disabled={cancelRunMutation.isPending}
                         className="px-4 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors flex items-center gap-2 text-red-500 disabled:opacity-50"

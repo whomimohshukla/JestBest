@@ -1,15 +1,21 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, XCircle, Info, X, TriangleAlert } from 'lucide-react';
-import { usePopupStore, type PopupItem, type PopupKind } from '../../lib/toast-popup';
+import { usePopupStore, type PopupItem, type PopupKind, DEFAULT_DURATIONS } from '../../lib/toast-popup';
+import { cn } from '../../utils/cn';
+
+/*
+ * Non-blocking corner toast stack (bottom-right). Toasts auto-dismiss with a
+ * linear progress bar; hovering freezes both. `loading` toasts persist until
+ * the caller resolves them and get an indeterminate shimmer instead of a
+ * timer. No backdrop, so the rest of the UI stays usable while a toast is up.
+ */
 
 interface KindStyle {
   Icon: typeof CheckCircle2;
   icon: string;
-  glow: string;
-  ring: string;
-  accent: string;
-  action: string;
+  bar: string;
+  border: string;
   label: string;
 }
 
@@ -17,54 +23,104 @@ const KIND: Record<PopupKind, KindStyle> = {
   success: {
     Icon: CheckCircle2,
     icon: 'text-emerald-400',
-    glow: 'shadow-emerald-500/10',
-    ring: 'from-emerald-500/25',
-    accent: 'border-emerald-500/40',
-    action: 'bg-emerald-600 hover:bg-emerald-500',
+    bar: 'bg-emerald-400/80',
+    border: 'border-emerald-500/30',
     label: 'Success',
   },
   error: {
     Icon: XCircle,
     icon: 'text-red-400',
-    glow: 'shadow-red-500/10',
-    ring: 'from-red-500/25',
-    accent: 'border-red-500/40',
-    action: 'bg-red-600 hover:bg-red-500',
+    bar: 'bg-red-400/80',
+    border: 'border-red-500/30',
     label: 'Something went wrong',
   },
   warning: {
     Icon: TriangleAlert,
     icon: 'text-amber-400',
-    glow: 'shadow-amber-500/10',
-    ring: 'from-amber-500/25',
-    accent: 'border-amber-500/40',
-    action: 'bg-amber-600 hover:bg-amber-500',
+    bar: 'bg-amber-400/80',
+    border: 'border-amber-500/30',
     label: 'Heads up',
   },
   info: {
     Icon: Info,
     icon: 'text-sky-400',
-    glow: 'shadow-sky-500/10',
-    ring: 'from-sky-500/25',
-    accent: 'border-sky-500/40',
-    action: 'bg-sky-600 hover:bg-sky-500',
+    bar: 'bg-sky-400/80',
+    border: 'border-sky-500/30',
     label: 'Note',
   },
   loading: {
     Icon: CheckCircle2,
     icon: 'text-zinc-300',
-    glow: 'shadow-white/5',
-    ring: 'from-white/10',
-    accent: 'border-white/15',
-    action: 'bg-zinc-700 hover:bg-zinc-600',
+    bar: 'bg-zinc-500/50',
+    border: 'border-white/10',
     label: 'Working',
   },
 };
 
+function ToastCard({ popup, onDismiss }: { popup: PopupItem; onDismiss: (id: string) => void }) {
+  const k = KIND[popup.kind] ?? KIND.info;
+  const { Icon } = k;
+  const dismissible = popup.kind !== 'loading';
+  const duration = DEFAULT_DURATIONS[popup.kind];
+  const [paused, setPaused] = useState(false);
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 8, scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+      onPointerEnter={() => dismissible && setPaused(true)}
+      onPointerLeave={() => dismissible && setPaused(false)}
+      role={popup.kind === 'error' ? 'alert' : 'status'}
+      aria-label={k.label}
+      className={cn(
+        'pointer-events-auto relative w-full max-w-sm overflow-hidden rounded-xl border bg-zinc-950/95 shadow-xl shadow-black/40 backdrop-blur-xl',
+        k.border
+      )}
+    >
+      <div className="flex items-start gap-3 px-4 py-3.5">
+        <div className="mt-0.5 shrink-0">
+          {popup.kind === 'loading' ? (
+            <span aria-hidden="true" className="block h-5 w-5 animate-loader-spin rounded-full border-2 border-current border-t-transparent text-zinc-200" />
+          ) : (
+            <Icon className={cn('h-5 w-5', k.icon)} aria-hidden="true" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm leading-snug text-zinc-100">{popup.message}</p>
+        </div>
+        {dismissible && (
+          <button
+            onClick={() => onDismiss(popup.id)}
+            aria-label="Dismiss notification"
+            className="-mr-1 -mt-1 shrink-0 rounded-md p-1 text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Linear lifetime bar. Driven entirely by CSS so pausing the animation
+          pauses the clock; `animationend` is the actual dismiss trigger. */}
+      {dismissible && duration > 0 && (
+        <div aria-hidden="true" className="h-0.5 w-full bg-white/[0.04]">
+          <div
+            className={cn('toast-progress h-full', k.bar)}
+            style={{ animationDuration: `${duration}ms`, animationPlayState: paused ? 'paused' : 'running' }}
+            onAnimationEnd={() => onDismiss(popup.id)}
+          />
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 export function PopupViewport() {
   const { popups, dismiss } = usePopupStore();
 
-  // Escape clears everything dismissible, matching the backdrop-click behaviour.
+  // Escape clears everything dismissible, matching the previous behaviour.
   useEffect(() => {
     if (popups.length === 0) return;
     const onKey = (e: KeyboardEvent) => {
@@ -75,110 +131,17 @@ export function PopupViewport() {
     return () => window.removeEventListener('keydown', onKey);
   }, [popups, dismiss]);
 
-  if (popups.length === 0) return null;
-
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm"
-      onClick={(e) => {
-        // Backdrop click clears everything that is dismissible. `loading` has no
-        // close affordance, so a blocking spinner must not be click-dismissed.
-        if (e.target !== e.currentTarget) return;
-        for (const p of popups) if (p.kind !== 'loading') dismiss(p.id);
-      }}
+      aria-live="polite"
+      aria-label="Notifications"
+      className="pointer-events-none fixed bottom-5 right-5 z-[200] flex w-full max-w-sm flex-col gap-2.5"
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="pointer-events-none flex max-h-[85vh] w-full max-w-md flex-col items-center gap-4 overflow-y-auto p-6"
-      >
-        <AnimatePresence initial={false}>
-          {popups.map((p: PopupItem) => {
-            const k = KIND[p.kind] ?? KIND.info;
-            const { Icon } = k;
-            const dismissible = p.kind !== 'loading';
-            const spin = p.kind === 'loading';
-
-            return (
-              <motion.div
-                key={p.id}
-                layout
-                role={dismissible ? 'alertdialog' : 'status'}
-                aria-label={k.label}
-                initial={{ opacity: 0, scale: 0.94, y: 14 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 8 }}
-                transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                className={`pointer-events-auto relative w-full shrink-0 overflow-hidden rounded-2xl border ${k.accent} bg-zinc-950/95 shadow-2xl shadow-black/60 backdrop-blur-xl ${k.glow}`}
-              >
-                <div
-                  className={`pointer-events-none absolute inset-x-0 -top-px h-px bg-gradient-to-r ${k.ring} to-transparent`}
-                  aria-hidden="true"
-                />
-
-                <div className="flex items-start gap-4 px-7 pt-7">
-                  <div className="shrink-0 rounded-xl bg-white/[0.04] p-2.5">
-                    {spin ? (
-                      <svg
-                        className={`h-6 w-6 animate-spin ${k.icon}`}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        aria-hidden="true"
-                      >
-                        <circle
-                          className="opacity-20"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                        />
-                        <path
-                          className="opacity-90"
-                          fill="currentColor"
-                          d="M12 2a10 10 0 0 1 10 10h-3a7 7 0 0 0-7-7V2Z"
-                        />
-                      </svg>
-                    ) : (
-                      <Icon className={`h-6 w-6 ${k.icon}`} aria-hidden="true" />
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-                      {k.label}
-                    </p>
-                    <p className="mt-1.5 text-[15px] font-medium leading-relaxed text-zinc-100">
-                      {p.message}
-                    </p>
-                  </div>
-
-                  {dismissible && (
-                    <button
-                      onClick={() => dismiss(p.id)}
-                      aria-label="Dismiss notification"
-                      className="-mr-1 -mt-1 shrink-0 rounded-lg p-1.5 text-zinc-500 transition-colors hover:bg-white/5 hover:text-zinc-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-
-                {dismissible && (
-                  <div className="px-7 pb-7 pt-5">
-                    <button
-                      onClick={() => dismiss(p.id)}
-                      className={`w-full rounded-lg px-4 py-2.5 text-sm font-semibold text-white transition-colors ${k.action} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-950`}
-                    >
-                      Dismiss
-                    </button>
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
+      <AnimatePresence initial={false}>
+        {popups.map((p: PopupItem) => (
+          <ToastCard key={p.id} popup={p} onDismiss={dismiss} />
+        ))}
+      </AnimatePresence>
     </div>
   );
 }

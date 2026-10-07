@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { organizationApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
-import { PageLoader, Select, FieldError , ButtonLoader } from '../../components/ui';
+import { PageLoader, Select, FieldError, ButtonLoader, useConfirm } from '../../components/ui';
 import { Mail, RefreshCw, Trash2, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 import type { Membership, MembershipRole } from '../../types';
@@ -12,6 +12,7 @@ import type { Membership, MembershipRole } from '../../types';
 const ROLES: MembershipRole[] = ['OWNER', 'ADMIN', 'QA_MANAGER', 'DEVELOPER', 'TESTER', 'VIEWER'];
 
 export default function MembersSettingsPage() {
+  const confirm = useConfirm();
   const orgId = useAuthStore((s) => s.organization?.id);
   const currentUserId = useAuthStore((s) => s.user?.id);
   const queryClient = useQueryClient();
@@ -84,11 +85,15 @@ export default function MembersSettingsPage() {
     changeRoleMutation.mutate({ userId: member.user.id, role });
   };
 
-  const handleRemove = (member: Membership) => {
+  const handleRemove = async (member: Membership) => {
     if (!member.user?.id) return;
-    if (window.confirm(`Remove ${member.user.name ?? member.user.email} from this organization?`)) {
-      removeMemberMutation.mutate(member.user.id);
-    }
+    const ok = await confirm({
+      title: 'Remove member',
+      message: `Remove ${member.user.name ?? member.user.email} from this organization? They will lose access immediately.`,
+      confirmLabel: 'Remove',
+    });
+    if (!ok) return;
+    removeMemberMutation.mutate(member.user.id);
   };
 
   return (

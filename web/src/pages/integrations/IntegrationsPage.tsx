@@ -16,7 +16,7 @@ import {
   PlugZap,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { PageLoader, Badge , ButtonLoader } from '../../components/ui';
+import { PageLoader, Badge, ButtonLoader, useConfirm } from '../../components/ui';
 import type { LucideIcon } from 'lucide-react';
 
 interface IntegrationField {
@@ -92,6 +92,7 @@ type IntegrationItem = {
 
 export default function IntegrationsPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [connectType, setConnectType] = useState<string | null>(null);
   const [configForm, setConfigForm] = useState<Record<string, string>>({});
 
@@ -226,10 +227,13 @@ export default function IntegrationsPage() {
                           Test
                         </button>
                         <button
-                          onClick={() => {
-                            if (window.confirm(`Disconnect ${integrationMeta.name}?`)) {
-                              disconnectMutation.mutate(connectedId);
-                            }
+                          onClick={async () => {
+                            const ok = await confirm({
+                              title: 'Disconnect integration',
+                              message: `Disconnect ${integrationMeta.name}? You can reconnect anytime with a fresh token.`,
+                              confirmLabel: 'Disconnect',
+                            });
+                            if (ok) disconnectMutation.mutate(connectedId);
                           }}
                           disabled={disconnectMutation.isPending}
                           className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-sm rounded-lg transition-colors flex items-center justify-center gap-2 text-red-500 disabled:opacity-50"

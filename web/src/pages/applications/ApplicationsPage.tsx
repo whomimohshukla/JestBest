@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { projectsApi, applicationsApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
-import { PageLoader, Select, EmptyState, Badge, HowToBox , ButtonLoader } from '../../components/ui';
+import { PageLoader, Select, EmptyState, Badge, HowToBox, ButtonLoader, useConfirm } from '../../components/ui';
 import {
   Plus,
   Globe,
@@ -22,6 +22,7 @@ import type { Application } from '../../types';
 const APPLICATION_TYPES = ['WEB', 'MOBILE', 'API', 'BROWSER_EXTENSION'];
 
 export default function ApplicationsPage() {
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     searchParams.get('projectId')
@@ -140,10 +141,14 @@ export default function ApplicationsPage() {
     });
   };
 
-  const handleDelete = (app: Application) => {
-    if (window.confirm(`Delete application "${app.name}"?`)) {
-      deleteMutation.mutate(app.id);
-    }
+  const handleDelete = async (app: Application) => {
+    const ok = await confirm({
+      title: 'Delete application',
+      message: `Delete application "${app.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    deleteMutation.mutate(app.id);
   };
 
   return (
