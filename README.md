@@ -460,8 +460,8 @@ must run serially** — which is why `npm test` passes `--runInBand`. Running
 `__tests__/fixtures/testApp.ts` provides `request()`, `createTestUser()`, and
 `resetDatabase()`, and closes queues/Redis on teardown so Jest can exit.
 
-Current state: **298 tests across 28 suites passing** on the backend and **26
-tests across 4 suites** in the SPA (`npm test --prefix web`), last full run.
+Current state: **316 tests across 31 suites passing** on the backend and **36
+tests across 7 suites** in the SPA (`npm test --prefix web`), last full run.
 
 | Suite | What it covers |
 | --- | --- |
@@ -483,6 +483,9 @@ tests across 4 suites** in the SPA (`npm test --prefix web`), last full run.
 | `integration/applications` | scan-status polling, cross-tenant and wrong-application rejection |
 | `integration/auth/oauth` | OAuth exchange-token redemption: single-use, atomic under concurrency, no session for a missing user |
 | `integration/webhooks` | signing secret is random and redacted everywhere except create; signature verify/tamper; SSRF targets refused |
+| `integration/webhooks/redeliver` | a replay creates a fresh attempt, and an id from another tenant, an unknown id or a switched-off webhook is refused |
+| `integration/analytics/flakyTests` | detected flakiness is joined to the caller's own test cases, worst first, and never crosses a tenant boundary |
+| `integration/auth/switchOrganization` | the new token pair carries the destination orgId, the presented refresh token is revoked, non-members and revoked members get `403` |
 | `integration/organizations/memberAccess` | every role can read the member list; only admins can mutate it |
 | `integration/billing/stripeWebhook` | signature over the exact raw bytes, the subscription row is updated before `200`, and a redelivered event id is acknowledged but applied once |
 | `integration/errors/prismaErrors` | a duplicate invite surfaces as `409 CONFLICT`, a missing row as `404`, through real routes |
@@ -507,8 +510,12 @@ npm run lint
 npm run build
 ```
 
-The `web` workspace has no test runner yet. The backend suite covers the API
-contract these pages depend on; component tests are the obvious gap.
+The SPA runs Vitest (`npm test --prefix web`, jsdom, setup in
+`src/test/setup.ts`). The suites cover the parts where a UI mistake is silent
+and expensive: session teardown, pagination-shaped responses, the flaky-test
+list, the delivery log's redeliver action, and the workspace switcher (including
+that a refused switch leaves the session alone). Pages themselves are covered by
+the backend contract tests, since they are thin query + render layers.
 
 A few frontend/backend contracts that were silently broken, and are now aligned:
 
@@ -631,6 +638,24 @@ stay red until the repository secrets below are set.
 Integration config is encrypted at rest, but no outbound code-hosting
 automation runs in production: nothing opens a pull request on a customer's
 behalf.
+
+### Remaining gaps
+
+Stated plainly so the boundary between "shipped" and "not shipped" is not
+inferred from the marketing copy:
+
+- **Billing is plan enforcement, not commerce.** `stripeService.createCheckoutSession`
+  exists but no route or page calls it, so upgrades go through
+  `PATCH /billing/plan` with a real Stripe key required only for webhooks.
+- **AWS SES is a stub** (`sendViaSES` throws). SMTP, SendGrid and the log
+  provider work; `.env` is configured for Gmail SMTP.
+- **Artifacts land in `/tmp`** until `AWS_S3_BUCKET` and AWS credentials are
+  set, which is fine locally and not durable on a container host.
+- **Updates are polled**, not pushed: there is no WebSocket or SSE channel, so
+  a live run page refreshes on an interval.
+- **No automated accessibility tests** (no axe, no focus-trap assertions); a
+  few landmarks and `aria-label`s are present but the suite does not enforce
+  them.
 
 ### Delivery guarantees
 
