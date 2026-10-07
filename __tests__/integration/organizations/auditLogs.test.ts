@@ -1,10 +1,4 @@
-import {
-  auth,
-  createTestUser,
-  request,
-  resetDatabase,
-  teardownDatabase,
-} from '../../fixtures/testApp';
+import { auth, createTestUser, request, resetDatabase, teardownDatabase } from '../../fixtures/testApp';
 
 /**
  * Audit-log pagination:

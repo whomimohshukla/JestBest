@@ -163,4 +163,3 @@ describe('canManageRole hierarchy', () => {
     expect(canManageRole('VIEWER', 'VIEWER')).toBe(false);
   });
 });
-
