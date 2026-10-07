@@ -102,10 +102,7 @@ describe('GET /analytics/flaky-tests', () => {
 
   it('does not leak another organization flaky analysis', async () => {
     const other = await createTestUser(api);
-    const otherProject = await api
-      .post(`${API}/projects`)
-      .set(auth(other))
-      .send({ name: 'Other Project' });
+    const otherProject = await api.post(`${API}/projects`).set(auth(other)).send({ name: 'Other Project' });
     const otherCase = await api
       .post(`${API}/test-cases`)
       .set(auth(other))
@@ -124,10 +121,7 @@ describe('GET /analytics/flaky-tests', () => {
 
   it('rejects a project owned by another organization', async () => {
     const other = await createTestUser(api);
-    const otherProject = await api
-      .post(`${API}/projects`)
-      .set(auth(other))
-      .send({ name: 'Foreign Project' });
+    const otherProject = await api.post(`${API}/projects`).set(auth(other)).send({ name: 'Foreign Project' });
 
     const res = await api
       .get(`${API}/analytics/flaky-tests`)
