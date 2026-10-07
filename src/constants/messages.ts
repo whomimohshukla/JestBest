@@ -37,6 +37,7 @@ export const Messages = {
     MEMBER_REMOVED: 'Member removed successfully.',
     ROLE_CHANGED: 'Member role updated successfully.',
     MEMBER_NOT_FOUND: 'Member not found in this organization.',
+    MEMBER_EXISTS: 'This user is already a member of the organization.',
     LAST_OWNER: 'Cannot remove or demote the last owner.',
   },
   PROJECT: {

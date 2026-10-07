@@ -134,16 +134,24 @@ export const organizationService = {
       user = await userRepository.create({ email: params.email });
     }
 
-    const membership = await organizationRepository.findMembership(params.organizationId, user.id);
-    if (membership) {
-      throw new ConflictError(Messages.ORG.MEMBER_NOT_FOUND);
+    // Active membership => conflict. Soft-deleted membership => revive it:
+    // the unique key is still held by the removed row, so inserting a second
+    // one violated the constraint and surfaced as a 500.
+    const anyMembership = await organizationRepository.findMembershipIncludingDeleted(
+      params.organizationId,
+      user.id
+    );
+    if (anyMembership && anyMembership.deletedAt === null) {
+      throw new ConflictError(Messages.ORG.MEMBER_EXISTS);
     }
 
-    const added = await organizationRepository.addMember({
-      organizationId: params.organizationId,
-      userId: user.id,
-      role: params.role,
-    });
+    const added = anyMembership
+      ? await organizationRepository.reviveMember(anyMembership.id, params.role)
+      : await organizationRepository.addMember({
+          organizationId: params.organizationId,
+          userId: user.id,
+          role: params.role,
+        });
 
     const inviter = await userRepository.findActiveById(params.invitedByUserId);
     await notificationService.notifyTeamInvitation({

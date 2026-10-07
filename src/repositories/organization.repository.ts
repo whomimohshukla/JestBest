@@ -34,6 +34,22 @@ export const organizationRepository = {
       where: { organizationId, userId, deletedAt: null },
     }),
 
+  // Includes soft-deleted rows. Membership carries
+  // @@unique([organizationId, userId]) over the row itself, so a removed
+  // member still occupies the key and a blind create fails with P2002.
+  findMembershipIncludingDeleted: (organizationId: string, userId: string) =>
+    prisma.membership.findUnique({
+      where: { organizationId_userId: { organizationId, userId } },
+    }),
+
+  // Re-inviting a removed member must revive the existing row rather than
+  // insert a second one.
+  reviveMember: (membershipId: string, role: Prisma.MembershipUpdateInput['role']) =>
+    prisma.membership.update({
+      where: { id: membershipId },
+      data: { deletedAt: null, role, joinedAt: new Date() },
+    }),
+
   findMembershipByUser: (userId: string) =>
     prisma.membership.findFirst({
       where: { userId, deletedAt: null },
