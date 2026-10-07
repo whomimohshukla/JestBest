@@ -9,6 +9,8 @@ import { passwordService } from './passwordService';
 import { tokenService } from './tokenService';
 import { toSlug, resolveUniqueSlug } from '../../utils/helpers';
 import { notificationService } from '../notification/notificationService';
+import { emailService } from '../notification/emailService';
+import { logger } from '../../config/logger';
 import type { MembershipRole } from '@prisma/client';
 import type {
   TokenPair,
@@ -98,7 +100,12 @@ export const authService = {
     );
     await notificationService.notifyEmailVerification(user, verificationToken);
 
-    const baseOrg = { id: organization.id, name: organization.name, slug: organization.slug, requireTwoFactor: false };
+    const baseOrg = {
+      id: organization.id,
+      name: organization.name,
+      slug: organization.slug,
+      requireTwoFactor: false,
+    };
 
     if (env.REQUIRE_EMAIL_VERIFICATION) {
       return {
@@ -181,9 +188,18 @@ export const authService = {
       const secret = user.twoFactorSecret ?? twoFactorService.generateSecret();
       if (!user.twoFactorSecret) {
         await userRepository.update(user.id, { twoFactorSecret: secret });
+        // The secret is emailed, never returned in the response. Returning it
+        // here meant a stolen password was sufficient to enrol an authenticator
+        // and take over the account, which is exactly what an org-level 2FA
+        // policy is meant to prevent. Possession of the password alone must not
+        // be enough, so the enrolment material goes to the verified inbox.
+        const otpauthUrl = twoFactorService.generateOtpauthUrl(secret, user.email);
+        await emailService
+          .sendTwoFactorSetupEmail(user.email, { name: user.name ?? '', secret, otpauthUrl })
+          .catch((err: unknown) => {
+            logger.error({ err, userId: user.id }, 'failed to email forced 2FA setup');
+          });
       }
-      const otpauthUrl = twoFactorService.generateOtpauthUrl(secret, user.email);
-      const qrDataUrl = await twoFactorService.generateQrDataUrl(secret, user.email);
       const twoFactorToken = signToken(
         { sub: user.id, orgId: org.id, roles, type: 'access', purpose: '2fa' },
         'access'
@@ -191,9 +207,9 @@ export const authService = {
       return {
         requiresTwoFactor: true,
         twoFactorToken,
+        setupRequired: !user.twoFactorSecret,
         user: toPublicUser(user),
         organization: { id: org.id, name: org.name, slug: org.slug, requireTwoFactor: org.requireTwoFactor },
-        setup: { secret, otpauthUrl, qrDataUrl },
       } satisfies TwoFactorAuthResult;
     }
 

@@ -16,11 +16,15 @@ export interface EmailOptions {
 const EMAIL_STYLES = {
   body: 'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f7;',
   container: 'max-width: 600px; margin: 0 auto; background: white;',
-  header: 'background: linear-gradient(135deg, #8A2E3A 0%, #6B2130 100%); color: white; padding: 40px 20px; text-align: center;',
+  header:
+    'background: linear-gradient(135deg, #8A2E3A 0%, #6B2130 100%); color: white; padding: 40px 20px; text-align: center;',
   content: 'padding: 40px 30px;',
-  footer: 'background: #f8f9fa; padding: 30px; text-align: center; color: #6c757d; font-size: 14px; border-top: 1px solid #dee2e6;',
-  button: 'display: inline-block; padding: 14px 28px; background: #8A2E3A; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0;',
-  badge: 'display: inline-block; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin: 5px;',
+  footer:
+    'background: #f8f9fa; padding: 30px; text-align: center; color: #6c757d; font-size: 14px; border-top: 1px solid #dee2e6;',
+  button:
+    'display: inline-block; padding: 14px 28px; background: #8A2E3A; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; margin: 20px 0;',
+  badge:
+    'display: inline-block; padding: 6px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin: 5px;',
 };
 
 /** Escape user-supplied values before they are interpolated into HTML. */
@@ -49,7 +53,8 @@ const humaniseExpiry = (value: string): string => {
 };
 
 /** Very small HTML-to-text fallback so messages still read in plain-text clients. */
-const htmlToText = (html: string): string =>  html
+const htmlToText = (html: string): string =>
+  html
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<br\s*\/?>/gi, '\n')
@@ -114,9 +119,9 @@ export const emailService = {
    */
   async sendEmail(options: EmailOptions): Promise<void> {
     const provider = env.EMAIL_PROVIDER || 'log';
-    
+
     logger.info({ to: options.to, subject: options.subject, provider }, 'Sending email');
-    
+
     try {
       if (provider === 'sendgrid') {
         await this.sendViaSendGrid(options);
@@ -127,32 +132,30 @@ export const emailService = {
       } else {
         await this.sendViaLog(options);
       }
-      
+
       logger.info({ to: options.to }, 'Email sent successfully');
     } catch (error) {
       logger.error({ error, to: options.to }, 'Failed to send email');
       throw error;
     }
   },
-  
+
   async sendViaSendGrid(options: EmailOptions): Promise<void> {
     const apiKey = env.SENDGRID_API_KEY;
     if (!apiKey) {
       throw new Error('SENDGRID_API_KEY not configured');
     }
-    
+
     const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         personalizations: [
           {
-            to: Array.isArray(options.to)
-              ? options.to.map((email) => ({ email }))
-              : [{ email: options.to }],
+            to: Array.isArray(options.to) ? options.to.map((email) => ({ email })) : [{ email: options.to }],
           },
         ],
         from: {
@@ -168,18 +171,18 @@ export const emailService = {
         ],
       }),
     });
-    
+
     if (!response.ok) {
       throw new Error(`SendGrid API error: ${response.status}`);
     }
   },
-  
+
   async sendViaSES(_options: EmailOptions): Promise<void> {
     // AWS SES integration would go here
     // For now, throw an error
     throw new Error('AWS SES not yet implemented');
   },
-  
+
   async sendViaSMTP(options: EmailOptions): Promise<void> {
     const transporter = getSmtpTransporter();
     const to = Array.isArray(options.to) ? options.to : [options.to];
@@ -221,14 +224,18 @@ export const emailService = {
     // eslint-disable-next-line no-console
     console.log(
       '\n' +
-      '='.repeat(72) + '\n' +
-      '   JESTBEST OUTGOING EMAIL (log provider)\n' +
-      '='.repeat(72) + '\n' +
-      `   To:      ${to}\n` +
-      `   Subject: ${options.subject}\n` +
-      '-'.repeat(72) + '\n' +
-      `${options.text ?? options.html}\n` +
-      '='.repeat(72) + '\n'
+        '='.repeat(72) +
+        '\n' +
+        '   JESTBEST OUTGOING EMAIL (log provider)\n' +
+        '='.repeat(72) +
+        '\n' +
+        `   To:      ${to}\n` +
+        `   Subject: ${options.subject}\n` +
+        '-'.repeat(72) +
+        '\n' +
+        `${options.text ?? options.html}\n` +
+        '='.repeat(72) +
+        '\n'
     );
 
     // Persist to a dev inbox file so links are easy to grab during development
@@ -240,7 +247,7 @@ export const emailService = {
       logger.warn({ error }, 'Failed to append email to dev inbox file');
     }
   },
-  
+
   /**
    * Send test failure notification
    */
@@ -257,7 +264,7 @@ export const emailService = {
     }
   ): Promise<void> {
     const subject = `❌ Test Failure: ${data.failedCount} test${data.failedCount > 1 ? 's' : ''} failed in ${data.projectName}`;
-    
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -327,10 +334,10 @@ export const emailService = {
 </body>
 </html>
     `;
-    
+
     await this.sendEmail({ to, subject, html });
   },
-  
+
   /**
    * Send test success notification
    */
@@ -344,7 +351,7 @@ export const emailService = {
     }
   ): Promise<void> {
     const subject = `✅ All Tests Passed: ${data.projectName}`;
-    
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -393,10 +400,10 @@ export const emailService = {
 </body>
 </html>
     `;
-    
+
     await this.sendEmail({ to, subject, html });
   },
-  
+
   /**
    * Send welcome email after registration
    */
@@ -407,8 +414,8 @@ export const emailService = {
       verificationUrl?: string;
     }
   ): Promise<void> {
-    const subject = '🎉 Welcome to JestBest - Let\'s Get Started!';
-    
+    const subject = "🎉 Welcome to JestBest - Let's Get Started!";
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -430,7 +437,9 @@ export const emailService = {
         Thank you for joining JestBest! We're excited to help you automate your testing and improve your software quality.
       </p>
       
-      ${data.verificationUrl ? `
+      ${
+        data.verificationUrl
+          ? `
       <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0;">
         <p style="margin: 0 0 15px 0; font-weight: 600;">📧 Please verify your email address:</p>
         <center>
@@ -440,7 +449,9 @@ export const emailService = {
           This link will expire in 24 hours.
         </p>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
       
       <h3 style="color: #8A2E3A; margin-top: 30px;">🚀 Quick Start Guide</h3>
       
@@ -505,10 +516,10 @@ export const emailService = {
 </body>
 </html>
     `;
-    
+
     await this.sendEmail({ to, subject, html });
   },
-  
+
   /**
    * Send email verification
    */
@@ -591,7 +602,79 @@ export const emailService = {
 
     await this.sendEmail({ to, subject, html, text });
   },
-  
+
+  /**
+   * Deliver a forced-2FA enrolment secret out of band.
+   *
+   * When an organization mandates two-factor auth, a user who has not enrolled
+   * yet cannot complete sign-in with only a password. Returning the TOTP secret
+   * in the login response would let anyone holding a stolen password enrol and
+   * immediately authenticate — defeating the very control the policy exists to
+   * provide. Sending it to the account's verified inbox keeps possession of the
+   * password insufficient on its own.
+   */
+  async sendTwoFactorSetupEmail(
+    to: string,
+    data: {
+      name: string;
+      secret: string;
+      otpauthUrl: string;
+    }
+  ): Promise<void> {
+    const subject = 'Set up two-factor authentication for your JestBest account';
+
+    const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="${EMAIL_STYLES.body}">
+  <div style="${EMAIL_STYLES.container}">
+    <div style="${EMAIL_STYLES.header}">
+      <p style="margin:0 0 10px 0;font-size:13px;letter-spacing:2px;text-transform:uppercase;opacity:0.85;">Two-factor authentication</p>
+      <h1 style="margin:0;font-size:26px;line-height:1.25;">Finish setting up 2FA</h1>
+    </div>
+
+    <div style="${EMAIL_STYLES.content}">
+      <p style="margin:0 0 16px 0;">Hi ${escapeHtml(data.name || 'there')},</p>
+
+      <p style="margin:0 0 24px 0;font-size:16px;line-height:1.65;">
+        Your organization requires two-factor authentication. Add this account to
+        your authenticator app, then enter the 6-digit code it shows to finish
+        signing in.
+      </p>
+
+      <div style="background:#f4f5f7;border-left:4px solid #8A2E3A;padding:14px 16px;margin:0 0 24px 0;border-radius:4px;">
+        <p style="margin:0 0 6px 0;color:#6b2130;font-size:13px;line-height:1.6;">Can&rsquo;t scan a QR code? Enter this setup key manually:</p>
+        <p style="margin:0;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:18px;letter-spacing:2px;color:#1f2328;">${escapeHtml(data.secret)}</p>
+      </div>
+
+      <p style="margin:0 0 24px 0;color:#6c757d;font-size:13px;line-height:1.6;">
+        This key is personal to you. If you did not try to sign in, reset your
+        password immediately and contact your organization owner.
+      </p>
+    </div>
+
+    <div style="${EMAIL_STYLES.footer}">
+      <p style="margin:0 0 8px 0;"><strong>JestBest</strong> &middot; AI-powered QA automation</p>
+      <p style="margin:0;font-size:12px;color:#8a8f98;">Sent to ${escapeHtml(to)}</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    const text =
+      `Hi ${data.name || 'there'},\n\n` +
+      `Your organization requires two-factor authentication. Add this account to your\n` +
+      `authenticator app, then enter the 6-digit code it shows to finish signing in.\n\n` +
+      `Setup key: ${data.secret}\n\n` +
+      `This key is personal to you. If you did not try to sign in, reset your\n` +
+      `password immediately and contact your organization owner.\n\n` +
+      `JestBest - AI-powered QA automation`;
+
+    await this.sendEmail({ to, subject, html, text });
+  },
+
   /**
    * Send password reset email
    */
@@ -603,7 +686,7 @@ export const emailService = {
     }
   ): Promise<void> {
     const subject = '🔐 Reset Your JestBest Password';
-    
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -651,10 +734,10 @@ export const emailService = {
 </body>
 </html>
     `;
-    
+
     await this.sendEmail({ to, subject, html });
   },
-  
+
   /**
    * Send team invitation email
    */
@@ -668,7 +751,7 @@ export const emailService = {
     }
   ): Promise<void> {
     const subject = `👥 ${data.inviterName} invited you to join ${data.organizationName} on JestBest`;
-    
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -716,7 +799,7 @@ export const emailService = {
 </body>
 </html>
     `;
-    
+
     await this.sendEmail({ to, subject, html });
   },
 
@@ -740,10 +823,9 @@ export const emailService = {
     }
   ): Promise<void> {
     const subject = `📊 Your Weekly JestBest Summary (${data.weekStart} - ${data.weekEnd})`;
-    const passRate = data.stats.testsRun > 0 
-      ? Math.round((data.stats.testsPassed / data.stats.testsRun) * 100) 
-      : 0;
-    
+    const passRate =
+      data.stats.testsRun > 0 ? Math.round((data.stats.testsPassed / data.stats.testsRun) * 100) : 0;
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -810,19 +892,27 @@ export const emailService = {
         </table>
       </div>
       
-      ${data.stats.topProjects.length > 0 ? `
+      ${
+        data.stats.topProjects.length > 0
+          ? `
       <div style="margin: 30px 0;">
         <h3 style="color: #333;">🏆 Top Active Projects</h3>
-        ${data.stats.topProjects.map((project, idx) => `
+        ${data.stats.topProjects
+          .map(
+            (project, idx) => `
           <div style="padding: 15px; background: ${idx === 0 ? '#fff7ed' : '#f8f9fa'}; border-left: 4px solid ${idx === 0 ? '#f97316' : '#8A2E3A'}; margin-bottom: 10px; border-radius: 4px;">
             <strong>${project.name}</strong>
             <div style="margin-top: 5px; color: #666; font-size: 14px;">
               ${project.testsRun} tests run • ${project.passRate}% pass rate
             </div>
           </div>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
-      ` : ''}
+      `
+          : ''
+      }
       
       <center>
         <a href="${env.APP_ORIGIN}/dashboard/analytics" style="${EMAIL_STYLES.button}">View Full Analytics</a>
@@ -845,10 +935,10 @@ export const emailService = {
 </body>
 </html>
     `;
-    
+
     await this.sendEmail({ to, subject, html });
   },
-  
+
   /**
    * Send bug created notification
    */
@@ -930,14 +1020,14 @@ export const emailService = {
     }
   ): Promise<void> {
     const subject = `🐛 Bug Assigned to You: ${data.bugTitle}`;
-    
+
     const severityColors: Record<string, string> = {
       CRITICAL: '#dc2626',
       HIGH: '#ea580c',
       MEDIUM: '#eab308',
       LOW: '#16a34a',
     };
-    
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -987,10 +1077,10 @@ export const emailService = {
 </body>
 </html>
     `;
-    
+
     await this.sendEmail({ to, subject, html });
   },
-  
+
   /**
    * Send deployment notification
    */
@@ -1009,7 +1099,7 @@ export const emailService = {
   ): Promise<void> {
     const isSuccess = data.deploymentStatus === 'SUCCESS';
     const subject = `${isSuccess ? '✅' : '❌'} Deployment ${data.deploymentStatus}: ${data.projectName} to ${data.environment}`;
-    
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -1034,18 +1124,26 @@ export const emailService = {
             <td style="padding: 8px 0;"><strong>Deployed By:</strong></td>
             <td style="padding: 8px 0; text-align: right;">${data.deployedBy}</td>
           </tr>
-          ${data.commitHash ? `
+          ${
+            data.commitHash
+              ? `
           <tr>
             <td style="padding: 8px 0;"><strong>Commit:</strong></td>
             <td style="padding: 8px 0; text-align: right;"><code>${data.commitHash.substring(0, 7)}</code></td>
           </tr>
-          ` : ''}
-          ${data.testsRun ? `
+          `
+              : ''
+          }
+          ${
+            data.testsRun
+              ? `
           <tr>
             <td style="padding: 8px 0;"><strong>Tests Run:</strong></td>
             <td style="padding: 8px 0; text-align: right;">${data.testsPassed}/${data.testsRun} passed</td>
           </tr>
-          ` : ''}
+          `
+              : ''
+          }
           <tr>
             <td style="padding: 8px 0;"><strong>Status:</strong></td>
             <td style="padding: 8px 0; text-align: right;">
@@ -1057,19 +1155,23 @@ export const emailService = {
         </table>
       </div>
       
-      ${isSuccess ? `
+      ${
+        isSuccess
+          ? `
       <div style="background: #d1f4e0; border-left: 4px solid #16a34a; padding: 15px; margin: 25px 0; border-radius: 4px;">
         <p style="margin: 0; color: #0f5132;">
           ✨ <strong>Deployment successful!</strong> Your application is now live on ${data.environment}.
         </p>
       </div>
-      ` : `
+      `
+          : `
       <div style="background: #f8d7da; border-left: 4px solid #dc2626; padding: 15px; margin: 25px 0; border-radius: 4px;">
         <p style="margin: 0; color: #721c24;">
           ⚠️ <strong>Deployment failed!</strong> Please check the logs for more details.
         </p>
       </div>
-      `}
+      `
+      }
       
       <center>
         <a href="${data.deploymentUrl}" style="${EMAIL_STYLES.button}">View Deployment Details</a>
@@ -1083,10 +1185,10 @@ export const emailService = {
 </body>
 </html>
     `;
-    
+
     await this.sendEmail({ to, subject, html });
   },
-  
+
   /**
    * Send critical bug alert
    */
@@ -1103,7 +1205,7 @@ export const emailService = {
     }
   ): Promise<void> {
     const subject = `🚨 CRITICAL BUG ALERT: ${data.bugTitle}`;
-    
+
     const html = `
 <!DOCTYPE html>
 <html>
@@ -1133,22 +1235,30 @@ export const emailService = {
               <span style="${EMAIL_STYLES.badge} background: #dc2626; color: white;">${data.environment}</span>
             </td>
           </tr>
-          ${data.affectedUsers ? `
+          ${
+            data.affectedUsers
+              ? `
           <tr>
             <td style="padding: 10px 0; border-bottom: 1px solid #dee2e6;"><strong>Affected Users:</strong></td>
             <td style="padding: 10px 0; text-align: right; border-bottom: 1px solid #dee2e6; color: #dc2626; font-weight: bold;">
               ~${data.affectedUsers}
             </td>
           </tr>
-          ` : ''}
-          ${data.errorRate ? `
+          `
+              : ''
+          }
+          ${
+            data.errorRate
+              ? `
           <tr>
             <td style="padding: 10px 0;"><strong>Error Rate:</strong></td>
             <td style="padding: 10px 0; text-align: right; color: #dc2626; font-weight: bold;">
               ${data.errorRate}%
             </td>
           </tr>
-          ` : ''}
+          `
+              : ''
+          }
         </table>
       </div>
       
@@ -1181,7 +1291,7 @@ export const emailService = {
 </body>
 </html>
     `;
-    
+
     await this.sendEmail({ to, subject, html });
   },
 };
