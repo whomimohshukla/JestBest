@@ -24,6 +24,7 @@ pgvector knowledge base, and files bugs into GitHub/Jira.
 - [Multi-tenancy and authorization](#multi-tenancy-and-authorization)
 - [Background jobs](#background-jobs)
 - [Testing](#testing)
+- [Frontend notes](#frontend-notes)
 - [Common tasks](#common-tasks)
 - [Deployment](#deployment)
 - [Implementation status](#implementation-status)
@@ -94,6 +95,11 @@ run the test suite:
 createdb jestbest
 createdb jestbest_test
 ```
+
+The final migration enables `pgvector` (`CREATE EXTENSION IF NOT EXISTS vector`)
+for the incident-knowledge embedding column. Without it, `npm run prisma:deploy`
+fails at that migration. Any Postgres 14+ with the extension available is fine;
+it does not have to be the Docker image.
 
 Then set `DATABASE_URL` for the app. The integration suites read
 `TEST_DATABASE_URL` and, if it is unset, fall back to
@@ -337,6 +343,22 @@ Every request is scoped to exactly one organization, resolved by
 Roles are `OWNER`, `ADMIN`, `QA_MANAGER`, `DEVELOPER`, `TESTER`, `VIEWER`, mapped
 to granular permissions in [`src/constants/permissions.ts`](src/constants/permissions.ts).
 
+Two details in that mapping are load-bearing:
+
+- **Roles are read from the database on every request**, not trusted from the
+  token. Access tokens are stateless and live for 15 minutes, so a role that was
+  revoked still appeared to hold its old permissions for that window. Membership
+  also filters `deletedAt: null`, so a removed member's token stops working
+  immediately.
+- **Reading the member list is not an admin action.** `GET
+  /organizations/:id/members` was gated behind `ORG_MEMBER_MANAGE`, so developers,
+  testers and viewers got a `403` on a page they are meant to be able to open.
+  There is now a separate `ORG_MEMBER_READ` granted to every role, while invites,
+  role changes and removals still require `ORG_MEMBER_MANAGE`.
+
+Changing a member's role or removing them revokes that user's refresh tokens, so
+a demotion takes effect without waiting for token expiry.
+
 > **Path parameters are not authorization.** A route like
 > `PATCH /organizations/:organizationId` authorizes against the caller's org,
 > but the *target* org comes from the URL. Every organization controller
@@ -383,8 +405,7 @@ must run serially** — which is why `npm test` passes `--runInBand`. Running
 `__tests__/fixtures/testApp.ts` provides `request()`, `createTestUser()`, and
 `resetDatabase()`, and closes queues/Redis on teardown so Jest can exit.
 
-Current state: **208 tests across 16 suites passing** (last full run), plus four
-suites added for the tenancy and broken-flow fixes listed below.
+Current state: **252 tests across 19 suites passing** (last full run).
 
 | Suite | What it covers |
 | --- | --- |
@@ -401,6 +422,52 @@ suites added for the tenancy and broken-flow fixes listed below.
 | `integration/integrations` | connecting to a foreign `projectId` is rejected; GitHub resolution prefers the bug's project |
 | `integration/agents` | unimplemented `EXECUTION`/`REPORT_AGENT` return 400, not 500 |
 | `integration/applications` | scan-status polling, cross-tenant and wrong-application rejection |
+| `integration/auth/oauth` | OAuth exchange-token redemption: single-use, atomic under concurrency, no session for a missing user |
+| `integration/webhooks` | signing secret is random and redacted everywhere except create; signature verify/tamper; SSRF targets refused |
+| `integration/organizations/memberAccess` | every role can read the member list; only admins can mutate it |
+
+## Frontend notes
+
+The SPA is React + Vite + TypeScript with TanStack Query and Zustand. Routes are
+code-split with `React.lazy` (`src/App.tsx`): only the landing page and the
+login/register screens load eagerly. Before splitting, the whole product shipped
+as one 1.27 MB bundle, so a first-time visitor who only needed the login page
+downloaded every feature.
+
+```bash
+cd web
+npm run dev
+npm run typecheck
+npm run lint
+npm run build
+```
+
+The `web` workspace has no test runner yet. The backend suite covers the API
+contract these pages depend on; component tests are the obvious gap.
+
+A few frontend/backend contracts that were silently broken, and are now aligned:
+
+- **Bug status.** The UI offered `WONT_FIX`, which is not in the Prisma
+  `BugStatus` enum, so saving a bug to that state always returned a `400`. The
+  equivalent existing state is `REJECTED`. The shared `BugStatus` type is now
+  declared as the enum's members so the next drift is a compile error.
+- **Bug comments.** The comment author is exposed as `user` (the Prisma
+  relation), but the UI read `comment.creator`, so every comment rendered
+  "Unknown user".
+- **Run duration.** `TestRun.duration` is milliseconds, computed as
+  `Date.now() - startedAt`. The formatter treated it as seconds, so a 2.5-second
+  run displayed as "2500.00s".
+- **Billing usage.** `GET /billing/usage` returns `{ subscription, current,
+  history, latest }`, but the settings page expected `testRunsUsed` and
+  `testRunLimit` at the top level — which the API never sent, so the panel read
+  `0 / 0` for every organization. The page now derives the limit from the plan
+  and reads `latest.testsRun`.
+- **Analytics quality score and release risk.** The API returns these only when
+  `projectId` is supplied; the dashboard never sent one, so both cards silently
+  never rendered. The dashboard now has a project selector.
+- **Refresh and logout.** A rotated refresh token was not persisted, so the app
+  fell back to the previous one. Logout sent no refresh token at all, leaving
+  the server-side session valid for the remainder of its 7-day life.
 
 ## Common tasks
 
@@ -430,7 +497,28 @@ npx playwright install chromium
 
 ## Deployment
 
-Split the three workloads — they have very different resource profiles:
+The full AWS runbook — architecture diagram, one-time setup, the CI/CD
+workflows, day-two operations and a script you can say out loud in an interview
+— lives in [`DEPLOYMENT.md`](DEPLOYMENT.md).
+
+The short version:
+
+- **Two images.** `Dockerfile` (multi-stage API, migrations run on boot) and
+  `web/Dockerfile` (Vite build served by nginx, which also proxies `/api` so the
+  browser only ever talks to one origin).
+- **Two workflows.** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs
+  typecheck/lint/format, all backend tests against real Postgres and Redis, all
+  frontend tests, and both image builds on every push and PR.
+  [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs after a
+  green CI on `main`: build → push to ECR → roll out the host.
+- **OIDC, not access keys.** GitHub assumes an IAM role scoped to this
+  repository's `main` branch, so no long-lived AWS credential exists anywhere.
+- **`docker-compose.prod.yml`** is the production topology: only nginx is
+  published; Postgres, Redis and the API are reachable only on the internal
+  network.
+
+Split the three workloads when it outgrows a single box — they have very
+different resource profiles:
 
 ```text
 Browser → static web build (Vercel/Netlify/S3+CDN)
@@ -500,3 +588,48 @@ It requires `APPLICATION_SCAN` and re-checks that the application belongs to the
 caller's organization, so a scan id from another tenant returns `403` and a scan
 that belongs to a different application returns `404`.
 
+
+### OAuth sign-in flow
+
+OAuth is a three-leg redirect, and the provider `code` is only usable by the
+server that holds the client secret — it is single-use and cannot be redeemed by
+the browser. The flow therefore splits the exchange:
+
+1. `GET /auth/oauth/:provider/authorize` generates a random state, stores it in
+   Redis for 10 minutes, and redirects to the provider.
+2. GitHub returns to `GET /auth/oauth/:provider/callback` on **the API**. The
+   callback consumes the state with an atomic `GETDEL`, exchanges the code, and
+   redirects the browser to
+   `${APP_ORIGIN}/auth/oauth/callback?provider=…&exchange=<token>`.
+3. The SPA calls `POST /auth/oauth/exchange` with that token. Redemption is an
+   atomic `GETDEL` too, so the token works exactly once and two concurrent
+   redemptions cannot both succeed (there is a test for exactly that race).
+
+Configuring `GITHUB_OAUTH_CALLBACK_URL` is the part that most often breaks this:
+it must point at the API's callback route, not at the SPA. A
+`/integrations/github/callback` path existed in `.env.example` and matched no
+route at all, so sign-in could never complete. `API_ORIGIN` provides the
+correct default (`${API_ORIGIN}${API_PREFIX}/auth/oauth/github/callback`).
+
+The state is still accepted as optional by the callback; requiring it is the
+obvious next tightening, along with binding it to the initiating browser session
+or adopting PKCE.
+
+### Webhook signing secrets
+
+`POST /webhooks` generates a 32-byte random secret when you do not supply one.
+It is returned **only** in the create response; list, get and update redact it,
+because it is the HMAC key a customer's systems trust. The UI surfaces it in a
+one-time dialog, since a generated secret that is never displayed cannot be
+configured on the receiving end.
+
+Previously the secret was `HMAC-SHA256(organizationId)`. The organization id is
+not secret — it appears in API responses and URLs — so anyone who knew an org's
+id could recompute its signing key and forge webhook deliveries that the
+customer's own endpoint would accept as genuine.
+
+Outbound delivery goes through `safeFetch`, which resolves the hostname and
+refuses loopback, link-local, private and cloud-metadata addresses, caps
+redirects, and bounds the response. It is applied at creation and update time so
+an internal target is rejected immediately rather than becoming a permanent
+delivery failure.
