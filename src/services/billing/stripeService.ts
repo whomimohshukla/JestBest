@@ -1,6 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { ensureStripeConfigured, throwStripeError } from './billingService';
 import { UpstreamError, UnauthorizedError } from '../../utils/errors';
 
 export interface StripeCustomer {
@@ -10,6 +9,23 @@ export interface StripeCustomer {
 export interface StripeSubscriptionResult {
   subscriptionId: string;
 }
+
+/**
+ * Fails closed when the instance has no Stripe key. Lives here rather than in
+ * billingService so the webhook path can verify signatures without importing
+ * billingService (which imports this module).
+ */
+export const throwStripeError = (): never => {
+  throw new UpstreamError('Stripe is not configured on this instance.');
+};
+
+export const ensureStripeConfigured = (): void => {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) {
+    throwStripeError();
+  }
+  void key;
+};
 
 const STRIPE_API = 'https://api.stripe.com/v1';
 

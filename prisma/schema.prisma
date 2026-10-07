@@ -830,6 +830,18 @@ model Subscription {
   @@index([status])
 }
 
+// One row per applied Stripe webhook event. Stripe retries any delivery that
+// does not get a 2xx, so without this table the same subscription update could
+// be applied twice (and a duplicate arriving mid-flight could interleave with
+// the original).
+model StripeWebhookEvent {
+  id         String   @id
+  type       String
+  receivedAt DateTime @default(now())
+
+  @@index([receivedAt])
+}
+
 model Usage {
   id                    String    @id @default(cuid())
   organizationId        String

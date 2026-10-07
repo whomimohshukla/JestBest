@@ -45,6 +45,10 @@ export const teardownDatabase = async (): Promise<void> => {
  */
 const TABLES_IN_DELETE_ORDER = [
   'auditLog',
+  // Standalone id, but must be cleared before any suite can assert that a
+  // redelivered Stripe event was not recorded twice.
+  'stripeWebhookEvent',
+  'incidentKnowledge',
   'webhookDelivery',
   'webhook',
   'integration',
