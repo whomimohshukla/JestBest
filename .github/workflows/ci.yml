@@ -1,0 +1,141 @@
+# CI: every push and every pull request.
+#
+# Runs the real integration suite against real Postgres (with pgvector) and
+# real Redis, because the API's riskiest behaviour — tenancy scoping, refresh
+# rotation, Prisma query shape — is exactly what a mocked database hides.
+#
+# Gates:
+#   backend  → typecheck, lint, format, unit + integration tests, build
+#   frontend → typecheck, lint, production build
+#   images   → both Dockerfiles must actually build
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (typecheck, lint, test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      # Same image as docker-compose.yml, so CI exercises pgvector migrations
+      # rather than a schema that differs from production.
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: jestbest
+          POSTGRES_PASSWORD: jestbest
+          POSTGRES_DB: jestbest_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U jestbest -d jestbest_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      NODE_ENV: test
+      LOG_LEVEL: silent
+      DATABASE_URL: postgresql://jestbest:jestbest@localhost:5432/jestbest_test?schema=public
+      TEST_DATABASE_URL: postgresql://jestbest:jestbest@localhost:5432/jestbest_test?schema=public
+      REDIS_URL: redis://localhost:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  frontend:
+    name: Frontend (typecheck, lint, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  images:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -t jestbest-api:ci .
+
+      - name: Build web image
+        run: docker build -t jestbest-web:ci ./web
