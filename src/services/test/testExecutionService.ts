@@ -7,6 +7,7 @@ import { pageService } from '../browser/pageService';
 import { usageService } from '../billing/usageService';
 import { logger } from '../../config/logger';
 import { aiQueue } from '../../queues/aiQueue';
+import { reportQueue } from '../../queues/reportQueue';
 import { webhookService } from '../webhook/webhookService';
 import { notificationService } from '../notification/notificationService';
 import type { TestStep } from '../../types/domain.types';
@@ -95,6 +96,26 @@ export const testExecutionService = {
         ...(failedResults.length > 1 ? { failingResults: failedResults } : {}),
       });
     }
+
+    // Flakiness is recomputed here, on the run's own completion, instead of
+    // inside GET /analytics/flaky-tests. Detection loads 100 results per test
+    // case and upserts a row per flaky case, so doing it on a read meant a
+    // page view performed unbounded writes and got slower with every project
+    // the caller belonged to.
+    await reportQueue
+      .add(
+        'detect-flaky-tests',
+        {
+          organizationId: context.organizationId,
+          projectId: context.projectId,
+          periodStart: new Date().toISOString(),
+          periodEnd: new Date().toISOString(),
+        },
+        { jobId: `flaky:${context.projectId}:${context.testRunId}` }
+      )
+      .catch((err: unknown) => {
+        logger.warn({ err, projectId: context.projectId }, 'failed to enqueue flaky detection');
+      });
 
     await webhookService.dispatch(
       context.organizationId,

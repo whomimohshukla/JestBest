@@ -29,7 +29,10 @@ export const reportService = {
 
   async buildReport(params: ReportParams): Promise<unknown> {
     const [quality, testMetrics, bugMetrics, agentMetrics, run] = await Promise.all([
-      analyticsService.qualityScore({ projectId: params.projectId }),
+      analyticsService.qualityScore({
+        projectId: params.projectId,
+        organizationId: params.organizationId,
+      }),
       metricsService.getTestMetrics({ projectId: params.projectId }),
       metricsService.getBugMetrics(params.projectId),
       metricsService.getAgentMetrics(params.organizationId),

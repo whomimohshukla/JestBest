@@ -34,6 +34,12 @@ const setupReportQueueWorker = (): Worker => {
   const worker = new Worker(
     'report',
     async (job) => {
+      if (job.name === 'detect-flaky-tests') {
+        const { flakyTestService } = await import('../services/analytics/flakyTestService');
+        const { projectId } = job.data as { projectId: string };
+        await flakyTestService.detectFlakyTests(projectId);
+        return;
+      }
       const { processReportGenerationJob } = await import('../jobs/reportGeneration');
       await processReportGenerationJob(job as never);
     },

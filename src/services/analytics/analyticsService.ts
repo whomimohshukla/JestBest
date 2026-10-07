@@ -1,8 +1,18 @@
 import { prisma } from '../../config/database';
 import { cacheService } from '../cache/cacheService';
+import { NotFoundError } from '../../utils/errors';
+import { Messages } from '../../constants/messages';
 
 export interface QualityScoreParams {
   projectId: string;
+  /**
+   * Required, not optional. These aggregations used to be keyed on `projectId`
+   * alone, so any authenticated caller could pass another tenant's project id
+   * and read their pass rates, bug counts and release risk. Resolving the
+   * project through the caller's organization makes a foreign id simply not
+   * exist.
+   */
+  organizationId: string;
 }
 
 export interface QualityScore {
@@ -18,24 +28,44 @@ export interface QualityScore {
 
 export const analyticsService = {
   async qualityScore(params: QualityScoreParams): Promise<QualityScore> {
+    const project = await resolveProject(params);
     return cacheService.remember(
-      `analytics:quality:${params.projectId}`,
+      `analytics:quality:${project.id}`,
       async () => {
-        const [totalRuns, passedRuns, openBugs, totalBugs, runs, resultStats] = await Promise.all([
-          prisma.testRun.count({ where: { projectId: params.projectId } }),
-          prisma.testRun.count({ where: { projectId: params.projectId, status: 'PASSED' } }),
-          prisma.bug.count({ where: { projectId: params.projectId, status: { not: 'CLOSED' } } }),
-          prisma.bug.count({ where: { projectId: params.projectId } }),
+        // Two grouped queries replace four separate counts over the same rows.
+        const [runStatuses, bugStatuses, runs] = await Promise.all([
+          prisma.testRun.groupBy({
+            by: ['status'],
+            where: { projectId: project.id },
+            _count: true,
+          }),
+          prisma.bug.groupBy({
+            by: ['status'],
+            where: { projectId: project.id },
+            _count: true,
+          }),
           prisma.testRun.findMany({
-            where: { projectId: params.projectId },
+            where: { projectId: project.id },
             orderBy: { createdAt: 'desc' },
             take: 30,
           }),
-          prisma.testResult.aggregate({
-            where: { testRun: { projectId: params.projectId } },
-            _count: true,
-          }),
         ]);
+
+        // Bounded to the same 30-run window as the other inputs. Counting every
+        // TestResult row ever written for the project was an unbounded join
+        // whose cost grew forever. Depends on `runs`, so it runs second.
+        const resultStats = await prisma.testResult.aggregate({
+          where: { testRunId: { in: runs.map((r) => r.id) } },
+          _count: true,
+        });
+
+        const statusCounts = new Map(runStatuses.map((r) => [r.status, r._count]));
+        const totalRuns = runStatuses.reduce((sum, r) => sum + r._count, 0);
+        const passedRuns = statusCounts.get('PASSED') ?? 0;
+        const totalBugs = bugStatuses.reduce((sum, b) => sum + b._count, 0);
+        const openBugs = bugStatuses
+          .filter((b) => b.status !== 'CLOSED')
+          .reduce((sum, b) => sum + b._count, 0);
 
         const passRate = totalRuns > 0 ? passedRuns / totalRuns : 0;
         const bugBurden = totalBugs > 0 ? Math.min(1, openBugs / totalBugs) : 0;
@@ -71,16 +101,17 @@ export const analyticsService = {
     details: Record<string, number>;
   }> {
     const quality = await analyticsService.qualityScore(params);
+    const project = await resolveProject(params);
     const [openCriticalBugs, recentRuns] = await Promise.all([
       prisma.bug.count({
         where: {
-          projectId: params.projectId,
+          projectId: project.id,
           status: { not: 'CLOSED' },
           severity: { in: ['CRITICAL', 'HIGH'] },
         },
       }),
       prisma.testRun.findMany({
-        where: { projectId: params.projectId },
+        where: { projectId: project.id },
         orderBy: { createdAt: 'desc' },
         take: 10,
       }),
@@ -133,8 +164,8 @@ export const analyticsService = {
       }),
     ]);
 
-    const quality = projectId ? await analyticsService.qualityScore({ projectId }) : null;
-    const risk = projectId ? await analyticsService.releaseRisk({ projectId }) : null;
+    const quality = projectId ? await analyticsService.qualityScore({ projectId, organizationId }) : null;
+    const risk = projectId ? await analyticsService.releaseRisk({ projectId, organizationId }) : null;
 
     return {
       projects,
@@ -148,6 +179,26 @@ export const analyticsService = {
 };
 
 const round = (value: number): number => Math.round(value * 100) / 100;
+
+/**
+ * Resolve a project within the caller's organization. A project belonging to a
+ * different tenant is indistinguishable from one that does not exist, which is
+ * what keeps these aggregates from becoming a cross-tenant read.
+ */
+const resolveProject = async (params: QualityScoreParams) => {
+  const project = await prisma.project.findFirst({
+    where: {
+      id: params.projectId,
+      organizationId: params.organizationId,
+      archivedAt: null,
+    },
+    select: { id: true },
+  });
+  if (!project) {
+    throw new NotFoundError(Messages.PROJECT.NOT_FOUND);
+  }
+  return project;
+};
 
 const estimateFlakiness = (
   runs: Array<{ passedTests: number; failedTests: number; totalTests: number }>
