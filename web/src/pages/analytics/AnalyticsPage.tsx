@@ -19,8 +19,9 @@ import {
 } from 'recharts';
 import { analyticsApi } from '../../api';
 import Layout from '../../components/Layout';
+import { FlakyTestsPanel } from '../../components/FlakyTestsList';
 import { PageHeader, StatCard, PageLoader, EmptyState, Badge } from '../../components/ui';
-import type { DashboardAnalytics, TestMetricsResponse } from '../../types';
+import type { DashboardAnalytics, TestMetricsResponse, FlakyTest } from '../../types';
 
 export default function AnalyticsPage() {
   const {
@@ -37,6 +38,13 @@ export default function AnalyticsPage() {
   const { data: metrics } = useQuery<TestMetricsResponse>({
     queryKey: ['analytics-test-metrics'],
     queryFn: () => analyticsApi.testMetrics({}),
+  });
+
+  // Independent of the dashboard payload so a slow detection job can never
+  // block the rest of the page.
+  const { data: flakyTests, isLoading: flakyLoading } = useQuery<FlakyTest[]>({
+    queryKey: ['analytics-flaky-tests'],
+    queryFn: () => analyticsApi.flakyTests({ pageSize: 10 }),
   });
 
   const daily = metrics?.daily ?? [];
@@ -200,6 +208,9 @@ export default function AnalyticsPage() {
               </div>
             )}
           </div>
+
+          {/* Flaky tests */}
+          <FlakyTestsPanel tests={flakyTests ?? []} isLoading={flakyLoading} />
 
           {/* Totals Summary */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

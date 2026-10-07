@@ -10,6 +10,7 @@ import type {
   DashboardAnalytics,
   TestMetricsResponse,
   AgentMetrics,
+  FlakyTest,
 } from '../types';
 
 export interface BugComment {
@@ -140,6 +141,9 @@ export const analyticsApi = {
     apiGet<TestMetricsResponse>('/analytics/tests', params),
   agentMetrics: (params?: Record<string, unknown>) =>
     apiGet<AgentMetrics>('/analytics/agents', params),
+  // Read-only: records are written by the `detect-flaky-tests` queue job.
+  flakyTests: (params?: Record<string, unknown>) =>
+    apiGet<FlakyTest[]>('/analytics/flaky-tests', params),
   generateReport: (data: { projectId?: string; testRunId?: string } = {}) =>
     apiPost<{ generated: boolean; queued: boolean }>('/analytics/reports', data),
 };
