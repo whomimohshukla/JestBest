@@ -14,6 +14,7 @@ export const ErrorCodes = {
   TWO_FACTOR_INVALID: 'TWO_FACTOR_INVALID',
   ACCOUNT_SUSPENDED: 'ACCOUNT_SUSPENDED',
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
 } as const satisfies Record<string, ErrorCode>;
 
 export type ErrorCodeConstant = (typeof ErrorCodes)[keyof typeof ErrorCodes];

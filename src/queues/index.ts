@@ -12,7 +12,15 @@ export const queues = {
 };
 
 export const closeAllQueues = async (): Promise<void> => {
-  await Promise.all([testQueue.close(), aiQueue.close(), reportQueue.close(), webhookQueue.close()]);
+  // aiExplorationQueue was missing here, so every process that shut down left
+  // one BullMQ connection open and the event loop never drained.
+  await Promise.all([
+    testQueue.close(),
+    aiQueue.close(),
+    aiExplorationQueue.close(),
+    reportQueue.close(),
+    webhookQueue.close(),
+  ]);
 };
 
 export type { TestJobData, TestJobNames } from './testQueue';

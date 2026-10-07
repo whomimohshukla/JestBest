@@ -1,1 +1,1 @@
-export { health } from './health';
+export { health, live, ready, setShuttingDown } from './health';

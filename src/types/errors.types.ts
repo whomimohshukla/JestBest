@@ -11,7 +11,8 @@ export type ErrorCode =
   | 'TWO_FACTOR_REQUIRED'
   | 'TWO_FACTOR_INVALID'
   | 'ACCOUNT_SUSPENDED'
-  | 'EMAIL_NOT_VERIFIED';
+  | 'EMAIL_NOT_VERIFIED'
+  | 'SERVICE_UNAVAILABLE';
 
 export interface ErrorPayload {
   code: ErrorCode;

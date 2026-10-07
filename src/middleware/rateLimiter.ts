@@ -16,6 +16,10 @@ export const createRateLimiter = (
     max: options.max ?? env.RATE_LIMIT_MAX,
     standardHeaders: true,
     legacyHeaders: false,
+    // Health probes come from the orchestrator and the load balancer on a fixed
+    // schedule. Counting them against the API budget means a busy deploy can
+    // throttle the very probe that decides whether the container is healthy.
+    skip: (req) => /(^|\/)health(\/|$)/.test(req.path),
     message: {
       success: false,
       error: {
