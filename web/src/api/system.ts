@@ -59,6 +59,11 @@ export const webhooksApi = {
   // was undefined and the deliveries table always rendered "No deliveries yet".
   deliveries: (id: string, params?: { page?: number; pageSize?: number }): Promise<Paginated<WebhookDelivery>> =>
     apiPaginated<WebhookDelivery>(`/webhooks/${id}/deliveries`, params),
+  // Replays the stored payload as a fresh delivery attempt (200 with
+  // { queued: true }), so an operator can recover from a downstream outage
+  // without re-triggering the event that caused it.
+  redeliver: (webhookId: string, deliveryId: string) =>
+    apiPost<{ queued: boolean }>(`/webhooks/${webhookId}/deliveries/${deliveryId}/redeliver`, {}),
 };
 
 export const apiKeysApi = {
