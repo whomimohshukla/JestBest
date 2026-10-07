@@ -1,5 +1,6 @@
 import { emailService } from './emailService';
 import { slackService } from '../integration/slack/slackService';
+import { integrationConfigOf } from '../integration/integrationService';
 import { prisma } from '../../config/database';
 import { logger } from '../../config/logger';
 import { env } from '../../config/environment';
@@ -345,7 +346,10 @@ export const notificationService = {
 
       if (!integration) return;
 
-      const config = integration.config as any;
+      // The stored config is AES-GCM ciphertext (see integrationService.connect).
+      // Sending it verbatim put base64 in the Authorization header, so every
+      // Slack notification failed auth and was swallowed by the catch below.
+      const config = integrationConfigOf(integration);
 
       if (type === 'test_failure') {
         await slackService.sendTestFailureNotification(config, data);
