@@ -39,6 +39,8 @@ export const Messages = {
     MEMBER_NOT_FOUND: 'Member not found in this organization.',
     MEMBER_EXISTS: 'This user is already a member of the organization.',
     LAST_OWNER: 'Cannot remove or demote the last owner.',
+    NOT_MEMBER: 'You are not an active member of this organization.',
+    SWITCHED: 'Switched organization successfully.',
   },
   PROJECT: {
     CREATED: 'Project created successfully.',

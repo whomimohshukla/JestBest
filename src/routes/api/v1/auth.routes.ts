@@ -12,6 +12,7 @@ import {
   oauthCallback,
   oauthAuthorize,
   oauthExchange,
+  switchOrganization,
 } from '../../../controllers/auth';
 import {
   registerSchema,
@@ -22,6 +23,7 @@ import {
   verifyEmailSchema,
   verifyTwoFactorSchema,
   oauthExchangeSchema,
+  switchOrganizationSchema,
 } from '../../../validators';
 import { validate } from '../../../middleware';
 import { authRateLimiter, authenticate } from '../../../middleware';
@@ -33,6 +35,9 @@ router.post('/register', authRateLimiter, validate(registerSchema), register);
 router.post('/login', authRateLimiter, validate(loginSchema), login);
 router.post('/refresh-token', authRateLimiter, validate(refreshTokenSchema), refreshToken);
 router.post('/logout', authenticate({ optional: true }), logout);
+// Workspace membership is re-verified server-side, so this only needs a valid
+// session — no rate limiter, no password re-prompt.
+router.post('/switch-organization', authenticate(), validate(switchOrganizationSchema), switchOrganization);
 router.post('/verify-email', validate(verifyEmailSchema), verifyEmailController);
 router.post('/verify-2fa', authRateLimiter, validate(verifyTwoFactorSchema), verifyTwoFactorController);
 router.post(

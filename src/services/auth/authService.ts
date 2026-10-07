@@ -279,6 +279,54 @@ export const authService = {
     }
   },
 
+  /**
+   * Move the session into another organization the user belongs to.
+   *
+   * The access token *is* the tenant boundary: every request is scoped by the
+   * orgId claim baked into it, so switching means re-issuing the token pair
+   * against a membership that is re-verified here. The caller can therefore
+   * only enter an organization they are an active (not soft-deleted) member
+   * of, and the refresh token they present is revoked so the previous
+   * workspace cannot be reached again by refreshing an old pair.
+   */
+  async switchOrganization(
+    userId: string,
+    organizationId: string,
+    currentRefreshToken?: string
+  ): Promise<AuthResult> {
+    const user = await userRepository.findActiveById(userId);
+    if (!user) {
+      throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
+    }
+
+    const membership = await organizationRepository.findMembership(organizationId, userId);
+    const organization = membership ? await organizationRepository.findById(organizationId) : null;
+    if (!membership || !organization) {
+      throw new ForbiddenError(Messages.ORG.NOT_MEMBER);
+    }
+
+    const roles: MembershipRole[] = [membership.role];
+    const tokens = await tokenService.issue({ userId, orgId: organization.id, roles });
+
+    if (currentRefreshToken) {
+      // revokeRefresh already swallows an invalid or rotated token, so this is
+      // best-effort by construction: a stale refresh token must never fail the
+      // switch the user can already see happening.
+      await tokenService.revokeRefresh(currentRefreshToken);
+    }
+
+    return {
+      user: toPublicUser(user),
+      organization: {
+        id: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+        requireTwoFactor: organization.requireTwoFactor,
+      },
+      tokens,
+    };
+  },
+
   async refreshTokens(refreshToken: string): Promise<{ user: PublicUser; tokens: TokenPair }> {
     const { tokens } = await tokenService.refresh(refreshToken);
     const payload = verifyToken(tokens.accessToken, 'access');

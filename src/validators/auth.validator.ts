@@ -66,3 +66,16 @@ export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 export const oauthExchangeSchema = z.object({
   exchangeToken: z.string().min(1),
 });
+
+/**
+ * Switching organizations re-issues the token pair, so the target must be
+ * named explicitly: nothing about the current token implies which workspace
+ * the caller wants next.
+ */
+export const switchOrganizationSchema = z.object({
+  organizationId: z.string().min(1, 'Organization is required'),
+  // The presented refresh token is revoked as part of the switch (session
+  // rotation), but is optional so a client that already dropped it can still
+  // move between workspaces.
+  refreshToken: z.string().min(1).optional(),
+});

@@ -8,6 +8,7 @@ export {
   changePasswordSchema,
   verifyTwoFactorSchema,
   oauthExchangeSchema,
+  switchOrganizationSchema,
   setupTwoFactorSchema,
   enableTwoFactorSchema,
   disableTwoFactorSchema,
