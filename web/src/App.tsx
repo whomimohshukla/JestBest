@@ -1,41 +1,46 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PopupViewport } from './components/ui/PopupViewport';
 import { useAuthStore } from './store/authStore';
 import ErrorBoundary from './components/ErrorBoundary';
+import { PageLoader } from './components/ui';
 import './index.css';
 
-// Pages
+// Landing is the entry point for every new visitor, so it stays eager. Every
+// other route is split: the previous single bundle was 1.27 MB and a visitor
+// who only saw the login page was downloading the whole product.
 import LandingPage from './pages/LandingPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import VerifyEmailPage from './pages/auth/VerifyEmailPage';
-import OAuthCallbackPage from './pages/auth/OAuthCallbackPage';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
-import DashboardPage from './pages/dashboard/DashboardPage';
-import ProjectsPage from './pages/projects/ProjectsPage';
-import ProjectDetailPage from './pages/projects/ProjectDetailPage';
-import ApplicationsPage from './pages/applications/ApplicationsPage';
-import TestCasesPage from './pages/tests/TestCasesPage';
-import TestSuitesPage from './pages/tests/TestSuitesPage';
-import TestRunsPage from './pages/testRuns/TestRunsPage';
-import TestRunDetailPage from './pages/testRuns/TestRunDetailPage';
-import BugsPage from './pages/bugs/BugsPage';
-import BugDetailPage from './pages/bugs/BugDetailPage';
-import AnalyticsPage from './pages/analytics/AnalyticsPage';
-import AgentsPage from './pages/agents/AgentsPage';
-import IntegrationsPage from './pages/integrations/IntegrationsPage';
-import DocumentationPage from './pages/DocumentationPage';
-import SettingsLayout from './pages/settings/SettingsLayout';
-import ProfileSettingsPage from './pages/settings/ProfileSettingsPage';
-import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage';
-import MembersSettingsPage from './pages/settings/MembersSettingsPage';
-import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage';
-import WebhooksSettingsPage from './pages/settings/WebhooksSettingsPage';
-import ApiKeysSettingsPage from './pages/settings/ApiKeysSettingsPage';
-import BillingSettingsPage from './pages/settings/BillingSettingsPage';
-import NotificationsSettingsPage from './pages/settings/NotificationsSettingsPage';
+
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
+const OAuthCallbackPage = lazy(() => import('./pages/auth/OAuthCallbackPage'));
+const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage'));
+const ProjectsPage = lazy(() => import('./pages/projects/ProjectsPage'));
+const ProjectDetailPage = lazy(() => import('./pages/projects/ProjectDetailPage'));
+const ApplicationsPage = lazy(() => import('./pages/applications/ApplicationsPage'));
+const TestCasesPage = lazy(() => import('./pages/tests/TestCasesPage'));
+const TestSuitesPage = lazy(() => import('./pages/tests/TestSuitesPage'));
+const TestRunsPage = lazy(() => import('./pages/testRuns/TestRunsPage'));
+const TestRunDetailPage = lazy(() => import('./pages/testRuns/TestRunDetailPage'));
+const BugsPage = lazy(() => import('./pages/bugs/BugsPage'));
+const BugDetailPage = lazy(() => import('./pages/bugs/BugDetailPage'));
+const AnalyticsPage = lazy(() => import('./pages/analytics/AnalyticsPage'));
+const AgentsPage = lazy(() => import('./pages/agents/AgentsPage'));
+const IntegrationsPage = lazy(() => import('./pages/integrations/IntegrationsPage'));
+const DocumentationPage = lazy(() => import('./pages/DocumentationPage'));
+const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'));
+const ProfileSettingsPage = lazy(() => import('./pages/settings/ProfileSettingsPage'));
+const OrganizationSettingsPage = lazy(() => import('./pages/settings/OrganizationSettingsPage'));
+const MembersSettingsPage = lazy(() => import('./pages/settings/MembersSettingsPage'));
+const IntegrationsSettingsPage = lazy(() => import('./pages/settings/IntegrationsSettingsPage'));
+const WebhooksSettingsPage = lazy(() => import('./pages/settings/WebhooksSettingsPage'));
+const ApiKeysSettingsPage = lazy(() => import('./pages/settings/ApiKeysSettingsPage'));
+const BillingSettingsPage = lazy(() => import('./pages/settings/BillingSettingsPage'));
+const NotificationsSettingsPage = lazy(() => import('./pages/settings/NotificationsSettingsPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -69,6 +74,8 @@ function App() {
       <Router>
         <div className="min-h-screen bg-background text-foreground">
           <ErrorBoundary>
+          {/* A chunk is fetched the first time its route is visited. */}
+          <Suspense fallback={<PageLoader label="Loading…" />}>
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
@@ -107,6 +114,7 @@ function App() {
 
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </Suspense>
           </ErrorBoundary>
         </div>
         <PopupViewport />
