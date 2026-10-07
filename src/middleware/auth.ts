@@ -7,6 +7,7 @@ import { prisma } from '../config/database';
 import { tokenService } from '../services/auth/tokenService';
 import type { AuthUser } from '../types/auth.types';
 import { ROLE_PERMISSIONS, roleHasPermission } from '../constants/roles';
+import type { RoleName } from '../constants/roles';
 
 export interface AuthenticateOptions {
   optional?: boolean;
@@ -59,7 +60,10 @@ export const authenticate = (options: AuthenticateOptions = {}) => {
         avatar: true,
         deletedAt: true,
         suspendedUntil: true,
-        memberships: { where: { organizationId: payload.orgId } },
+        // `deletedAt: null` is load-bearing: Membership is soft-deleted, so
+        // without it a member removed from an organization keeps
+        // authenticating against it for as long as their token chain lives.
+        memberships: { where: { organizationId: payload.orgId, deletedAt: null } },
       },
     });
 
@@ -87,7 +91,11 @@ export const authenticate = (options: AuthenticateOptions = {}) => {
       throw new UnauthorizedError(Messages.AUTH.INVALID_TOKEN);
     }
 
-    const roles = payload.roles.length > 0 ? payload.roles : [membership.role];
+    // The live membership row is authoritative, never the `roles` claim. A role
+    // demotion (OWNER -> VIEWER) has to take effect immediately, but the claim
+    // is baked into the token and lives for its whole TTL, so trusting it let a
+    // demoted member keep admin permissions until the token expired.
+    const roles: RoleName[] = [membership.role];
     const permissions = Array.from(new Set(roles.flatMap((role) => ROLE_PERMISSIONS[role] ?? [])));
 
     const authUser: AuthUser = {

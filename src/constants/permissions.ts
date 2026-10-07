@@ -28,6 +28,12 @@ export const Permissions = {
   BILLING_MANAGE: 'billing:manage',
   ORG_MANAGE: 'organization:manage',
   ORG_MEMBER_MANAGE: 'organization:member:manage',
+  /**
+   * Viewing the member list is a read, not an administration task. Gating it
+   * behind ORG_MEMBER_MANAGE meant developers, testers and viewers got a 403 on
+   * a page they are expected to be able to open.
+   */
+  ORG_MEMBER_READ: 'organization:member:read',
 } as const;
 
 export type Permission = (typeof Permissions)[keyof typeof Permissions];

@@ -7,6 +7,7 @@ import { canManageRole } from '../../constants/roles';
 import { toSlug, resolveUniqueSlug } from '../../utils/helpers';
 import { logger } from '../../config/logger';
 import { notificationService } from '../notification/notificationService';
+import { tokenService } from '../auth/tokenService';
 
 export interface CreateOrganizationParams {
   name: string;
@@ -180,6 +181,13 @@ export const organizationService = {
     }
 
     await organizationRepository.softDeleteMember(targetMembership.id);
+
+    // Offboarding must actually end access. The auth middleware already refuses
+    // a soft-deleted membership, but the removed member's refresh tokens would
+    // otherwise stay valid and could be exchanged for a session.
+    await tokenService.revokeAllForUser(targetUserId).catch((err: unknown) => {
+      logger.warn({ err, targetUserId }, 'failed to revoke sessions after member removal');
+    });
   },
 
   async changeMemberRole(
@@ -212,6 +220,15 @@ export const organizationService = {
     }
 
     await organizationRepository.updateMemberRole(targetMembership.id, newRole);
+
+    // Access tokens are stateless and carry no role claim the middleware trusts
+    // (it re-reads the membership each request), so a role change is reflected
+    // immediately. Refresh tokens, however, mint a new pair from the live
+    // membership now but remain individually valid; retiring them means a
+    // demoted user cannot keep the old grant alive by refreshing.
+    await tokenService.revokeAllForUser(targetUserId).catch((err: unknown) => {
+      logger.warn({ err, targetUserId }, 'failed to revoke sessions after role change');
+    });
   },
 
   async listForUser(userId: string): Promise<Array<{ organization: Organization; role: MembershipRole }>> {

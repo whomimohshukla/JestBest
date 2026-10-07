@@ -53,6 +53,7 @@ export const ROLE_PERMISSIONS: Record<MembershipRole, Permission[]> = {
     Permissions.BILLING_MANAGE,
     Permissions.ORG_MANAGE,
     Permissions.ORG_MEMBER_MANAGE,
+    Permissions.ORG_MEMBER_READ,
   ],
   QA_MANAGER: [
     Permissions.PROJECT_READ,
@@ -75,6 +76,7 @@ export const ROLE_PERMISSIONS: Record<MembershipRole, Permission[]> = {
     Permissions.INTEGRATION_READ,
     Permissions.WEBHOOK_READ,
     Permissions.ANALYTICS_READ,
+    Permissions.ORG_MEMBER_READ,
   ],
   DEVELOPER: [
     Permissions.PROJECT_READ,
@@ -86,6 +88,7 @@ export const ROLE_PERMISSIONS: Record<MembershipRole, Permission[]> = {
     Permissions.BUG_UPDATE,
     Permissions.AGENT_READ,
     Permissions.ANALYTICS_READ,
+    Permissions.ORG_MEMBER_READ,
   ],
   TESTER: [
     Permissions.PROJECT_READ,
@@ -100,6 +103,7 @@ export const ROLE_PERMISSIONS: Record<MembershipRole, Permission[]> = {
     Permissions.AGENT_TRIGGER,
     Permissions.AGENT_READ,
     Permissions.ANALYTICS_READ,
+    Permissions.ORG_MEMBER_READ,
   ],
   VIEWER: [
     Permissions.PROJECT_READ,
@@ -108,6 +112,7 @@ export const ROLE_PERMISSIONS: Record<MembershipRole, Permission[]> = {
     Permissions.BUG_READ,
     Permissions.AGENT_READ,
     Permissions.ANALYTICS_READ,
+    Permissions.ORG_MEMBER_READ,
   ],
 };
 

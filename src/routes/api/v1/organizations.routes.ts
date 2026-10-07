@@ -57,7 +57,7 @@ router.post(
 );
 router.get(
   '/:organizationId/members',
-  requirePermission(Permissions.ORG_MEMBER_MANAGE),
+  requirePermission(Permissions.ORG_MEMBER_READ),
   validate(getOrganizationParamsSchema, 'params'),
   listMembers
 );
