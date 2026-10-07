@@ -18,6 +18,13 @@ export interface ExecutionContext {
   organizationId: string;
 }
 
+/**
+ * How long a RUNNING claim is honoured before another worker may take the run
+ * over. Covers a worker that died mid-run (OOM, deploy); without it a crashed
+ * run would sit in RUNNING forever because the retry is refused by the claim.
+ */
+const STALE_CLAIM_MS = 10 * 60 * 1000;
+
 export const testExecutionService = {
   async executeRun(context: ExecutionContext): Promise<void> {
     const testRun = await testRunRepository.findWithResults(context.testRunId);
@@ -26,15 +33,50 @@ export const testExecutionService = {
       return;
     }
 
-    await testRunRepository.update(context.testRunId, {
-      status: 'RUNNING',
-      executionStartedAt: new Date(),
+    // Claim the run before doing any work. BullMQ redelivers jobs (retries
+    // after a transient error, a duplicate enqueue, two workers draining the
+    // queue), and without this compare-and-set both would execute the same run
+    // and bill usage twice. updateMany with a status predicate is atomic, so
+    // exactly one worker wins.
+    const claimed = await prisma.testRun.updateMany({
+      where: {
+        id: context.testRunId,
+        OR: [
+          { status: 'PENDING' },
+          { status: 'RUNNING', executionStartedAt: { lt: new Date(Date.now() - STALE_CLAIM_MS) } },
+        ],
+      },
+      data: { status: 'RUNNING', executionStartedAt: new Date() },
     });
+    if (claimed.count === 0) {
+      logger.info(
+        { testRunId: context.testRunId, status: testRun.status },
+        'test run already claimed or finished; skipping duplicate execution'
+      );
+      return;
+    }
 
     const startedAt = Date.now();
     const failedResults: Array<{ testResultId: string; testCaseId: string; testCaseTitle: string }> = [];
+    let cancelled = false;
 
     for (const testResult of testRun.testResults) {
+      // Cancellation flips this row while the loop is awaiting a browser. Check
+      // before every case so a cancelled run stops spending browser time and
+      // never gets its CANCELLED verdict overwritten by PASSED/FAILED.
+      const current = await prisma.testRun.findUnique({
+        where: { id: context.testRunId },
+        select: { status: true },
+      });
+      if (current?.status !== 'RUNNING') {
+        cancelled = true;
+        logger.info(
+          { testRunId: context.testRunId, status: current?.status },
+          'test run stopped; halting execution'
+        );
+        break;
+      }
+
       try {
         const outcome = await testExecutionService.executeTestCase(testResult.testCase, testRun, context);
         await testResultRepository.upsert(context.testRunId, testResult.testCaseId, {
@@ -67,24 +109,40 @@ export const testExecutionService = {
       }
     }
 
+    if (cancelled) {
+      // Results written up to the cancellation are kept (they are real
+      // observations), but the verdict, usage billing, webhooks and
+      // notifications belong to the cancel path only.
+      return;
+    }
+
     const results = await testResultRepository.listByRun(context.testRunId);
     const passedTests = results.filter((r) => r.status === 'PASSED').length;
     const failedCount = results.filter((r) => r.status === 'FAILED').length;
     const skippedTests = results.filter((r) => r.status === 'SKIPPED').length;
     const finalStatus: 'PASSED' | 'FAILED' = failedCount > 0 ? 'FAILED' : 'PASSED';
 
+    const finalized = await prisma.testRun.updateMany({
+      where: { id: context.testRunId, status: 'RUNNING' },
+      data: {
+        status: finalStatus,
+        passedTests,
+        failedTests: failedCount,
+        skippedTests,
+        duration: Date.now() - startedAt,
+        executionCompletedAt: new Date(),
+      },
+    });
+    if (finalized.count === 0) {
+      // Cancelled between the last check and now: leave CANCELLED in place and
+      // do not bill usage or announce a verdict for a run the user stopped.
+      logger.info({ testRunId: context.testRunId }, 'test run cancelled during execution');
+      return;
+    }
+
     await usageService.increment(context.organizationId, {
       testsRun: results.length,
       apiRequests: 1,
-    });
-
-    await testRunRepository.update(context.testRunId, {
-      status: failedCount > 0 ? 'FAILED' : 'PASSED',
-      passedTests,
-      failedTests: failedCount,
-      skippedTests,
-      duration: Date.now() - startedAt,
-      executionCompletedAt: new Date(),
     });
 
     if (failedResults.length > 0) {
@@ -111,7 +169,7 @@ export const testExecutionService = {
           periodStart: new Date().toISOString(),
           periodEnd: new Date().toISOString(),
         },
-        { jobId: `flaky:${context.projectId}:${context.testRunId}` }
+        { jobId: `flaky-${context.projectId}-${context.testRunId}` }
       )
       .catch((err: unknown) => {
         logger.warn({ err, projectId: context.projectId }, 'failed to enqueue flaky detection');

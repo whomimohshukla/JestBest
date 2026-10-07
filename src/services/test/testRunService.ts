@@ -4,7 +4,7 @@ import { testCaseRepository } from '../../repositories/testCase.repository';
 import { NotFoundError, BadRequestError } from '../../utils/errors';
 import { Messages } from '../../constants/messages';
 import { pagination } from '../../utils/formatters';
-import { testQueue } from '../../queues/testQueue';
+import { enqueueTestExecution, testQueue } from '../../queues/testQueue';
 import type { TestJobData } from '../../queues/testQueue';
 import { webhookService } from '../webhook/webhookService';
 import type { ListResponse } from '../../types/api.types';
@@ -54,7 +54,7 @@ export const testRunService = {
 
     await testRunRepository.createResults(testRun.id, testCaseIds);
 
-    await testQueue.add('execute-test-run', {
+    await enqueueTestExecution({
       testRunId: testRun.id,
       testCaseIds,
       organizationId: params.organizationId,
