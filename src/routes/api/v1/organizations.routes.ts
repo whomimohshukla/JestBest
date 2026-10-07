@@ -20,6 +20,7 @@ import {
   inviteMemberSchema,
   updateMemberRoleSchema,
   memberParamsSchema,
+  listAuditLogsQuerySchema,
 } from '../../../validators';
 
 const router = Router();
@@ -80,6 +81,7 @@ router.get(
   '/:organizationId/audit-logs',
   requirePermission(Permissions.ORG_MANAGE),
   validate(getOrganizationParamsSchema, 'params'),
+  validate(listAuditLogsQuerySchema, 'query'),
   listAuditLogs
 );
 

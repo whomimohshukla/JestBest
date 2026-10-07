@@ -21,6 +21,7 @@ import {
   assignBugSchema,
   addBugCommentSchema,
   listBugsQuerySchema,
+  listBugCommentsQuerySchema,
 } from '../../../validators';
 
 const router = Router();
@@ -74,6 +75,7 @@ router.get(
   '/:bugId/comments',
   requirePermission(Permissions.BUG_READ),
   validate(bugParamsSchema, 'params'),
+  validate(listBugCommentsQuerySchema, 'query'),
   listBugComments
 );
 

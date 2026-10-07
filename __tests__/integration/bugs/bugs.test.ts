@@ -64,12 +64,9 @@ describe('POST /bugs', () => {
     expect(res.body.error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('refuses to file a bug against another organization\'s project', async () => {
+  it("refuses to file a bug against another organization's project", async () => {
     const other = await createTestUser(api, { organizationName: 'Other Org' });
-    const foreign = await api
-      .post(`${API}/projects`)
-      .set(auth(other))
-      .send({ name: 'Foreign' });
+    const foreign = await api.post(`${API}/projects`).set(auth(other)).send({ name: 'Foreign' });
 
     const res = await api
       .post(`${API}/bugs`)
@@ -92,10 +89,7 @@ describe('GET /bugs', () => {
 
   it('filters by status', async () => {
     const created = await api.post(`${API}/bugs`).set(auth(user)).send(newBug('Closed me'));
-    await api
-      .patch(`${API}/bugs/${created.body.data.id}/status`)
-      .set(auth(user))
-      .send({ status: 'CLOSED' });
+    await api.patch(`${API}/bugs/${created.body.data.id}/status`).set(auth(user)).send({ status: 'CLOSED' });
 
     const open = await api.get(`${API}/bugs?status=OPEN`).set(auth(user));
     expect(open.body.data.items).toHaveLength(0);
@@ -106,10 +100,7 @@ describe('GET /bugs', () => {
 
   it('filters by severity', async () => {
     await api.post(`${API}/bugs`).set(auth(user)).send(newBug('High one'));
-    await api
-      .post(`${API}/bugs`)
-      .set(auth(user))
-      .send({ projectId, title: 'Low one', severity: 'LOW' });
+    await api.post(`${API}/bugs`).set(auth(user)).send({ projectId, title: 'Low one', severity: 'LOW' });
 
     const res = await api.get(`${API}/bugs?severity=HIGH`).set(auth(user));
     expect(res.body.data.items).toHaveLength(1);
@@ -166,10 +157,7 @@ describe('PATCH /bugs/:bugId/status', () => {
     const created = await api.post(`${API}/bugs`).set(auth(user)).send(newBug('Status flow'));
     const id = created.body.data.id as string;
 
-    const res = await api
-      .patch(`${API}/bugs/${id}/status`)
-      .set(auth(user))
-      .send({ status: 'IN_PROGRESS' });
+    const res = await api.patch(`${API}/bugs/${id}/status`).set(auth(user)).send({ status: 'IN_PROGRESS' });
     expect(res.status).toBe(200);
     expect(res.body.data.status).toBe('IN_PROGRESS');
   });
@@ -178,10 +166,7 @@ describe('PATCH /bugs/:bugId/status', () => {
     const created = await api.post(`${API}/bugs`).set(auth(user)).send(newBug('Bad status'));
     const id = created.body.data.id as string;
 
-    const res = await api
-      .patch(`${API}/bugs/${id}/status`)
-      .set(auth(user))
-      .send({ status: 'NOT_A_STATUS' });
+    const res = await api.patch(`${API}/bugs/${id}/status`).set(auth(user)).send({ status: 'NOT_A_STATUS' });
     expect(res.status).toBe(400);
   });
 });
@@ -235,11 +220,26 @@ describe('bug comments', () => {
     const created = await api.post(`${API}/bugs`).set(auth(user)).send(newBug('Empty'));
     const id = created.body.data.id as string;
 
-    const res = await api
-      .post(`${API}/bugs/${id}/comments`)
-      .set(auth(user))
-      .send({ content: '' });
+    const res = await api.post(`${API}/bugs/${id}/comments`).set(auth(user)).send({ content: '' });
     expect(res.status).toBe(400);
+  });
+
+  it('caps pageSize rather than exporting every comment', async () => {
+    const created = await api.post(`${API}/bugs`).set(auth(user)).send(newBug('Capped'));
+    const id = created.body.data.id as string;
+
+    const res = await api.get(`${API}/bugs/${id}/comments?page=1&pageSize=1000000`).set(auth(user));
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('accepts a pageSize inside the limit', async () => {
+    const created = await api.post(`${API}/bugs`).set(auth(user)).send(newBug('Within'));
+    const id = created.body.data.id as string;
+
+    const res = await api.get(`${API}/bugs/${id}/comments?pageSize=100`).set(auth(user));
+    expect(res.status).toBe(200);
   });
 });
 
