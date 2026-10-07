@@ -21,10 +21,13 @@ const EVENT_OPTIONS: { value: WebhookEventType; label: string }[] = [
 ];
 
 function WebhookDeliveries({ webhookId }: { webhookId: string }) {
+  const [page, setPage] = useState(1);
   const { data: deliveries, isLoading } = useQuery({
-    queryKey: ['webhook-deliveries', webhookId],
-    queryFn: () => webhooksApi.deliveries(webhookId),
+    queryKey: ['webhook-deliveries', webhookId, page],
+    queryFn: () => webhooksApi.deliveries(webhookId, { page, pageSize: 10 }),
   });
+
+  const items = deliveries?.items ?? [];
 
   // The API records HTTP outcome (succeededAt/failedAt/nextRetryAt), not a
   // status enum, so delivery state is derived from those timestamps.
@@ -47,37 +50,63 @@ function WebhookDeliveries({ webhookId }: { webhookId: string }) {
       <p className="text-sm text-muted-foreground mb-3">Recent deliveries</p>
       {isLoading ? (
         <p className="text-sm text-muted-foreground py-2">Loading deliveries...</p>
-      ) : deliveries && deliveries.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-muted-foreground">
-                <th className="py-2 pr-4 font-medium">Event</th>
-                <th className="py-2 pr-4 font-medium">Status</th>
-                <th className="py-2 pr-4 font-medium">Response</th>
-                <th className="py-2 pr-4 font-medium">Attempts</th>
-                <th className="py-2 font-medium">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deliveries.map((d) => (
-                <tr key={d.id} className="border-b border-border/50">
-                  <td className="py-2 pr-4 font-mono text-xs">{d.eventType}</td>
-                  <td className="py-2 pr-4">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${deliveryStatusColor(d)}`}
-                    >
-                      {deliveryStatus(d)}
-                    </span>
-                  </td>
-                  <td className="py-2 pr-4">{d.responseStatus ?? '—'}</td>
-                  <td className="py-2 pr-4">{d.attempts}</td>
-                  <td className="py-2">{new Date(d.createdAt).toLocaleString()}</td>
+      ) : items.length > 0 ? (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-muted-foreground">
+                  <th className="py-2 pr-4 font-medium">Event</th>
+                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 pr-4 font-medium">Response</th>
+                  <th className="py-2 pr-4 font-medium">Attempts</th>
+                  <th className="py-2 font-medium">Date</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {items.map((d) => (
+                  <tr key={d.id} className="border-b border-border/50">
+                    <td className="py-2 pr-4 font-mono text-xs">{d.eventType}</td>
+                    <td className="py-2 pr-4">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${deliveryStatusColor(d)}`}
+                      >
+                        {deliveryStatus(d)}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4">{d.responseStatus ?? '—'}</td>
+                    <td className="py-2 pr-4">{d.attempts}</td>
+                    <td className="py-2">{new Date(d.createdAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {(deliveries?.totalPages ?? 1) > 1 && (
+            <div className="flex items-center justify-between gap-3 mt-3 text-xs text-muted-foreground">
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                className="px-3 py-1.5 rounded-lg border border-border hover:bg-secondary/60 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span>
+                Page {deliveries?.page ?? 1} of {deliveries?.totalPages ?? 1} ·{' '}
+                {deliveries?.total ?? items.length} deliveries
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(deliveries?.totalPages ?? 1, p + 1))}
+                disabled={page >= (deliveries?.totalPages ?? 1)}
+                className="px-3 py-1.5 rounded-lg border border-border hover:bg-secondary/60 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <p className="text-sm text-muted-foreground py-2">No deliveries yet.</p>
       )}
@@ -93,14 +122,19 @@ export default function WebhooksSettingsPage() {
   const [form, setForm] = useState({ url: '', secret: '', eventTypes: [] as WebhookEventType[] });
   const [formErrors, setFormErrors] = useState<{ url?: string; eventTypes?: string }>({});
 
-  const { data: webhooks, isLoading, isError, refetch, isFetching } = useQuery({
+  const {
+    data: webhooks,
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ['webhooks'],
     queryFn: () => webhooksApi.list(),
   });
 
   const createWebhookMutation = useMutation({
-    mutationFn: (data: { url: string; eventTypes: string[]; secret: string }) =>
-      webhooksApi.create(data),
+    mutationFn: (data: { url: string; eventTypes: string[]; secret: string }) => webhooksApi.create(data),
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
       setShowModal(false);
@@ -120,8 +154,7 @@ export default function WebhooksSettingsPage() {
   });
 
   const toggleActiveMutation = useMutation({
-    mutationFn: (webhook: Webhook) =>
-      webhooksApi.update(webhook.id, { isActive: !webhook.isActive }),
+    mutationFn: (webhook: Webhook) => webhooksApi.update(webhook.id, { isActive: !webhook.isActive }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['webhooks'] });
       toast.success('Webhook updated');
@@ -180,11 +213,7 @@ export default function WebhooksSettingsPage() {
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-    >
+    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div>
           <h2 className="text-lg font-semibold mb-1">Webhooks</h2>
@@ -324,9 +353,9 @@ export default function WebhooksSettingsPage() {
               Copy your signing secret
             </h3>
             <p className="mt-2 text-sm text-muted-foreground">
-              This is the only time it will be shown. Our API redacts it on every
-              subsequent read, so copy it now — use it as the HMAC key when
-              verifying <code className="text-xs">X-JestBest-Signature</code>.
+              This is the only time it will be shown. Our API redacts it on every subsequent read, so copy it
+              now — use it as the HMAC key when verifying{' '}
+              <code className="text-xs">X-JestBest-Signature</code>.
             </p>
             <div className="mt-4 flex items-center gap-2">
               <input
@@ -409,8 +438,7 @@ export default function WebhooksSettingsPage() {
                   disabled={createWebhookMutation.isPending}
                 />
                 <p id="webhook-secret-hint" className="mt-1 text-xs text-muted-foreground">
-                  At least 16 characters. Leave blank and we will generate one and
-                  show it to you once.
+                  At least 16 characters. Leave blank and we will generate one and show it to you once.
                 </p>
               </div>
 

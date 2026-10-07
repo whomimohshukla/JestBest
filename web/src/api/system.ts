@@ -1,5 +1,5 @@
 import { apiGet, apiPost, apiPatch, apiDelete, apiPaginated } from './client';
-import type { AgentRun, Integration, Webhook, WebhookDelivery, ApiKey, Billing, BillingUsage, User } from '../types';
+import type { AgentRun, Integration, Paginated, Webhook, WebhookDelivery, ApiKey, Billing, BillingUsage, User } from '../types';
 
 export const usersApi = {
   me: () =>
@@ -54,8 +54,11 @@ export const webhooksApi = {
   remove: (id: string) => apiDelete<{ message: string }>(`/webhooks/${id}`),
   triggerTest: (id: string) =>
     apiPost<{ message: string }>(`/webhooks/${id}/test`),
-  deliveries: (id: string) =>
-    apiGet<WebhookDelivery[]>(`/webhooks/${id}/deliveries`),
+  // The endpoint is paginated (`{ items, total, page, ... }`), not a bare
+  // array: reading it with apiGet left the page with an object, so `.length`
+  // was undefined and the deliveries table always rendered "No deliveries yet".
+  deliveries: (id: string, params?: { page?: number; pageSize?: number }): Promise<Paginated<WebhookDelivery>> =>
+    apiPaginated<WebhookDelivery>(`/webhooks/${id}/deliveries`, params),
 };
 
 export const apiKeysApi = {
