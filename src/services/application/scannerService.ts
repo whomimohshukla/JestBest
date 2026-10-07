@@ -2,6 +2,7 @@ import { applicationRepository } from '../../repositories/application.repository
 import { browserService } from '../browser/browserService';
 import { logger } from '../../config/logger';
 import { toSlug } from '../../utils/helpers';
+import { assertSafeUrl } from '../../utils/safeFetch';
 import type { Prisma } from '@prisma/client';
 
 export interface ExploreParams {
@@ -23,7 +24,10 @@ const MAX_COMPONENTS_PER_PAGE = 60;
 
 export const scannerService = {
   async exploreApplication(params: ExploreParams): Promise<ExploreResult> {
-    const browserContext = await browserService.newContext();
+    // Every link reached from here is user-supplied (and, once the crawl
+    // starts, attacker-supplied), so the whole context — including redirects
+    // the per-URL check above cannot see — refuses private addresses.
+    const browserContext = await browserService.newContext({ blockPrivateNetwork: true });
     let pagesDiscovered = 0;
     let componentsDiscovered = 0;
     let workflowsDiscovered = 0;
@@ -36,6 +40,19 @@ export const scannerService = {
       while (queue.length > 0 && seenUrls.size < maxPages) {
         const url = queue.shift();
         if (!url || seenUrls.has(url)) continue;
+
+        // Every navigation target is user-supplied and reached from the server's
+        // network position, so each hop is re-checked: an external page can link
+        // to an internal host and drag the browser there. `--no-sandbox` in
+        // browserService makes the consequences of reaching an internal admin
+        // service considerably worse.
+        try {
+          await assertSafeUrl(url);
+        } catch (error) {
+          logger.warn({ url, err: error }, 'skipped unsafe URL during exploration');
+          continue;
+        }
+
         seenUrls.add(url);
 
         let snapshot;

@@ -1,5 +1,6 @@
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import { logger } from '../../config/logger';
+import { assertSafeUrl } from '../../utils/safeFetch';
 
 export interface PageSnapshot {
   url: string;
@@ -26,24 +27,72 @@ const getBrowser = async (): Promise<Browser> => {
   return browser;
 };
 
+// Resolved in-process by the browser rather than over the network, so they
+// skip the DNS check. `file:` is deliberately not here: reading local files
+// during a crawl is as bad as reaching 169.254.169.254.
+const INLINE_SCHEMES = ['data:', 'blob:', 'about:', 'chrome:'];
+
+/**
+ * Install a guard that inspects every request the context issues — not just the
+ * URL we asked for. A page we were allowed to open can redirect, or link, to
+ * `http://169.254.169.254/…` and the browser will happily follow it, which is
+ * exactly how a crawl of a hostile site turns into an SSRF read on the host.
+ *
+ * DNS results are memoised per context: a single page fans out to hundreds of
+ * subresources and re-resolving each one would dominate the crawl.
+ */
+const installPrivateNetworkGuard = async (context: BrowserContext): Promise<void> => {
+  const verdicts = new Map<string, boolean>();
+
+  const isSafe = async (url: string): Promise<boolean> => {
+    if (INLINE_SCHEMES.some((scheme) => url.toLowerCase().startsWith(scheme))) return true;
+    let host: string;
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      return false;
+    }
+    const cached = verdicts.get(host);
+    if (cached !== undefined) return cached;
+    let safe = true;
+    try {
+      await assertSafeUrl(url);
+    } catch {
+      safe = false;
+    }
+    verdicts.set(host, safe);
+    return safe;
+  };
+
+  await context.route('**/*', async (route) => {
+    const url = route.request().url();
+    if (await isSafe(url)) {
+      await route.continue();
+      return;
+    }
+    logger.warn({ url }, 'blocked browser request to a private or reserved address');
+    await route.abort('blockedbyclient');
+  });
+};
+
 const getSelectorFor = async (element: any): Promise<string> => {
   try {
     // Try to get a stable selector
     const id = await element.getAttribute('id');
     if (id) return `#${id}`;
-    
+
     const dataTestId = await element.getAttribute('data-testid');
     if (dataTestId) return `[data-testid="${dataTestId}"]`;
-    
+
     const name = await element.getAttribute('name');
     if (name) return `[name="${name}"]`;
-    
+
     const type = await element.getAttribute('type');
     const tagName = await element.evaluate((el: Element) => el.tagName.toLowerCase());
-    
+
     if (tagName === 'input' && type) return `input[type="${type}"]`;
     if (tagName === 'button') return 'button[type="submit"]';
-    
+
     // Fallback to a more general selector
     return tagName;
   } catch {
@@ -52,15 +101,24 @@ const getSelectorFor = async (element: any): Promise<string> => {
 };
 
 export const browserService = {
-  async newContext(options?: { recordVideo?: boolean; recordHar?: boolean }): Promise<BrowserContext> {
+  async newContext(options?: {
+    recordVideo?: boolean;
+    recordHar?: boolean;
+    /**
+     * Block requests to private/reserved addresses. Only for crawls of
+     * untrusted sites: test runs must still reach `http://localhost:3000`,
+     * where the application under test usually lives, so they leave this off.
+     */
+    blockPrivateNetwork?: boolean;
+  }): Promise<BrowserContext> {
     const browserInstance = await getBrowser();
-    
+
     const contextOptions: any = {
       viewport: { width: 1280, height: 800 },
       deviceScaleFactor: 1,
       locale: 'en-US',
     };
-    
+
     // Enable video recording if requested
     if (options?.recordVideo) {
       contextOptions.recordVideo = {
@@ -68,7 +126,7 @@ export const browserService = {
         size: { width: 1280, height: 800 },
       };
     }
-    
+
     // Enable HAR recording if requested
     if (options?.recordHar) {
       contextOptions.recordHar = {
@@ -76,19 +134,23 @@ export const browserService = {
         omitContent: false,
       };
     }
-    
-    return browserInstance.newContext(contextOptions);
+
+    const context = await browserInstance.newContext(contextOptions);
+    if (options?.blockPrivateNetwork) {
+      await installPrivateNetworkGuard(context);
+    }
+    return context;
   },
 
   async closeContext(context: BrowserContext): Promise<void> {
     await context.close();
   },
-  
+
   async saveVideo(page: Page): Promise<string | null> {
     try {
       const videoPath = await page.video()?.path();
       if (!videoPath) return null;
-      
+
       // Video is saved locally, return the path
       // In production, upload to S3 using storageService
       return videoPath;
@@ -97,7 +159,7 @@ export const browserService = {
       return null;
     }
   },
-  
+
   async saveHar(_context: BrowserContext): Promise<string | null> {
     try {
       // HAR is automatically saved when context closes if recordHar was enabled
@@ -169,9 +231,7 @@ export const browserService = {
                   const parent = current.parentElement;
                   if (parent) {
                     const tagName = current.tagName;
-                    const siblings = Array.from(parent.children).filter(
-                      (child) => child.tagName === tagName
-                    );
+                    const siblings = Array.from(parent.children).filter((child) => child.tagName === tagName);
                     if (siblings.length > 1) {
                       segment = `${segment}:nth-of-type(${siblings.indexOf(current) + 1})`;
                     }
@@ -217,26 +277,28 @@ export const browserService = {
   async discoverWorkflows(context: BrowserContext, baseUrl: string): Promise<WorkflowSnapshot[]> {
     const workflows: WorkflowSnapshot[] = [];
     const page = await context.newPage();
-    
+
     try {
       await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
       await page.waitForTimeout(1000);
-      
+
       // Detect login workflow
       const loginForm = await page.$(
         'form[action*="login"], form[action*="signin"], form:has(input[type="password"])'
       );
-      
+
       if (loginForm) {
-        const emailInput = await loginForm.$('input[type="email"], input[name*="email"], input[name*="username"]');
+        const emailInput = await loginForm.$(
+          'input[type="email"], input[name*="email"], input[name*="username"]'
+        );
         const passwordInput = await loginForm.$('input[type="password"]');
         const submitButton = await loginForm.$('button[type="submit"], input[type="submit"]');
-        
+
         if (emailInput && passwordInput && submitButton) {
           const emailSelector = await getSelectorFor(emailInput);
           const passwordSelector = await getSelectorFor(passwordInput);
           const submitSelector = await getSelectorFor(submitButton);
-          
+
           workflows.push({
             name: 'User Login',
             steps: [
@@ -249,34 +311,36 @@ export const browserService = {
           });
         }
       }
-      
+
       // Detect signup/registration workflow
       const signupForm = await page.$(
         'form[action*="signup"], form[action*="register"], a[href*="signup"], a[href*="register"]'
       );
-      
+
       if (signupForm) {
-        const isLink = (await signupForm.evaluate(el => el.tagName)) === 'A';
-        
+        const isLink = (await signupForm.evaluate((el) => el.tagName)) === 'A';
+
         if (isLink) {
           const href = await signupForm.getAttribute('href');
           if (href) {
             const signupUrl = new URL(href, baseUrl).href;
             await page.goto(signupUrl, { waitUntil: 'domcontentloaded' });
-            
+
             const form = await page.$('form');
             if (form) {
               const nameInput = await form.$('input[name*="name"], input[id*="name"]');
               const emailInput = await form.$('input[type="email"], input[name*="email"]');
               const passwordInput = await form.$('input[type="password"]');
               const submitButton = await form.$('button[type="submit"], input[type="submit"]');
-              
+
               if (emailInput && passwordInput) {
                 workflows.push({
                   name: 'User Registration',
                   steps: [
                     { action: 'goto', url: signupUrl },
-                    ...(nameInput ? [{ action: 'fill', selector: await getSelectorFor(nameInput), value: '{{name}}' }] : []),
+                    ...(nameInput
+                      ? [{ action: 'fill', selector: await getSelectorFor(nameInput), value: '{{name}}' }]
+                      : []),
                     { action: 'fill', selector: await getSelectorFor(emailInput), value: '{{email}}' },
                     { action: 'fill', selector: await getSelectorFor(passwordInput), value: '{{password}}' },
                     { action: 'click', selector: await getSelectorFor(submitButton) },
@@ -288,18 +352,18 @@ export const browserService = {
           }
         }
       }
-      
+
       // Detect search workflow
       const searchInput = await page.$(
         'input[type="search"], input[name*="search"], input[placeholder*="search" i]'
       );
-      
+
       if (searchInput) {
         const searchForm = await searchInput.$('xpath=ancestor::form');
-        const searchButton = searchForm 
+        const searchButton = searchForm
           ? await searchForm.$('button[type="submit"], input[type="submit"]')
           : null;
-        
+
         workflows.push({
           name: 'Search',
           steps: [
@@ -310,22 +374,24 @@ export const browserService = {
           ],
         });
       }
-      
+
       // Detect contact form workflow
       const contactForm = await page.$('form[action*="contact"], form[id*="contact"]');
-      
+
       if (contactForm) {
         const nameInput = await contactForm.$('input[name*="name"]');
         const emailInput = await contactForm.$('input[type="email"], input[name*="email"]');
         const messageInput = await contactForm.$('textarea');
         const submitButton = await contactForm.$('button[type="submit"], input[type="submit"]');
-        
+
         if (emailInput && messageInput) {
           workflows.push({
             name: 'Contact Form Submission',
             steps: [
               { action: 'goto', url: page.url() },
-              ...(nameInput ? [{ action: 'fill', selector: await getSelectorFor(nameInput), value: '{{name}}' }] : []),
+              ...(nameInput
+                ? [{ action: 'fill', selector: await getSelectorFor(nameInput), value: '{{name}}' }]
+                : []),
               { action: 'fill', selector: await getSelectorFor(emailInput), value: '{{email}}' },
               { action: 'fill', selector: await getSelectorFor(messageInput), value: '{{message}}' },
               { action: 'click', selector: await getSelectorFor(submitButton) },
@@ -333,7 +399,7 @@ export const browserService = {
           });
         }
       }
-      
+
       return workflows;
     } catch (error) {
       logger.error({ error, baseUrl }, 'workflow discovery failed');
