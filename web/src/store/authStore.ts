@@ -13,11 +13,20 @@ interface AuthState {
   updateOrganization: (organization: Organization) => void;
 }
 
-const clearStorage = () => {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-  localStorage.removeItem('user');
-  localStorage.removeItem('auth-storage');
+const AUTH_STORAGE_KEYS = ['accessToken', 'refreshToken', 'user', 'auth-storage'] as const;
+
+/**
+ * The one place a session is torn down.
+ *
+ * The API client used to keep its own `clearTokens` that only removed the two
+ * token keys, leaving this store's persisted record behind — so after a
+ * refresh failure the router still believed the user was signed in, bounced
+ * them off the login page and back into an app whose every request 401'd.
+ */
+export const clearAuthSession = () => {
+  for (const key of AUTH_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+  }
 };
 
 const restoreUser = (): User | null => {
@@ -46,7 +55,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: () => {
-        clearStorage();
+        clearAuthSession();
         set({ user: null, organization: null, token: null, isAuthenticated: false });
       },
 
@@ -65,12 +74,17 @@ export const useAuthStore = create<AuthState>()(
         token: state.token,
         isAuthenticated: state.isAuthenticated,
       }),
-      onRehydrateStorage: () => (state) => {
+      // The persisted `isAuthenticated` flag is not evidence of a session: the
+      // 401 path clears the tokens before it can clear this record, so trusting
+      // the flag on rehydrate traps the user in a signed-in UI with no
+      // credentials. A live access token is the only thing that counts.
+      merge: (persisted, current) => {
         const accessToken = localStorage.getItem('accessToken');
-        if (state && accessToken) {
-          state.isAuthenticated = true;
-          state.token = accessToken;
+        const merged = { ...current, ...(persisted as Partial<AuthState> | undefined) };
+        if (!accessToken) {
+          return { ...current, user: null, organization: null, token: null, isAuthenticated: false };
         }
+        return { ...merged, token: accessToken, isAuthenticated: true };
       },
     }
   )

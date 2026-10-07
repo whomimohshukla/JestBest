@@ -1,6 +1,7 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import type { ApiResponse, ApiError, Paginated } from '../types';
 import { useBackendStore } from '../lib/backend';
+import { clearAuthSession } from '../store/authStore';
 import toast from 'react-hot-toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
@@ -23,9 +24,16 @@ const getTokens = () => ({
   refreshToken: localStorage.getItem('refreshToken'),
 });
 
+/**
+ * Tear down the whole session, tokens included.
+ *
+ * Only clearing the two token keys used to leave the persisted auth record in
+ * place: the router then kept the user "signed in" while every request 401'd,
+ * and because the missing-refresh-token path below threw before reaching
+ * `failRefresh`, nothing ever redirected them to the login page either.
+ */
 const clearTokens = () => {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
+  clearAuthSession();
 };
 
 const completeRefresh = (tokens: { accessToken: string; refreshToken?: string }) => {
@@ -52,7 +60,13 @@ const failRefresh = (error: unknown) => {
 
 const refreshAccessToken = async (): Promise<string> => {
   const { refreshToken } = getTokens();
-  if (!refreshToken) throw new Error('No refresh token');
+  if (!refreshToken) {
+    // No token to refresh means the session is already gone (another tab
+    // logged out, or an earlier failure cleared it). Fail it the same way as
+    // a rejected refresh instead of throwing past the redirect.
+    failRefresh(new Error('No refresh token'));
+    throw new Error('No refresh token');
+  }
 
   if (!isRefreshing) {
     isRefreshing = true;
@@ -122,7 +136,8 @@ apiClient.interceptors.response.use(
     // being offline — treating it as offline raised a false "server offline"
     // banner for ordinary backend bugs.
     const status = error.response?.status;
-    const transportDown = !error.response ||
+    const transportDown =
+      !error.response ||
       error.code === 'ERR_NETWORK' ||
       error.code === 'ECONNABORTED' ||
       error.code === 'ETIMEDOUT' ||
@@ -196,7 +211,10 @@ export const apiGet = async <T>(url: string, params?: Record<string, unknown>): 
   return response.data.data as T;
 };
 
-export const apiPaginated = async <T>(url: string, params?: Record<string, unknown>): Promise<Paginated<T>> => {
+export const apiPaginated = async <T>(
+  url: string,
+  params?: Record<string, unknown>
+): Promise<Paginated<T>> => {
   const response = await apiClient.get<ApiResponse<Paginated<T>>>(url, { params });
   const data = response.data.data as Paginated<T>;
   if (data && Array.isArray((data as unknown as { items?: T[] }).items)) return data;
@@ -209,7 +227,11 @@ export const apiPaginated = async <T>(url: string, params?: Record<string, unkno
   };
 };
 
-export const apiPost = async <T>(url: string, data?: unknown, params?: Record<string, unknown>): Promise<T> => {
+export const apiPost = async <T>(
+  url: string,
+  data?: unknown,
+  params?: Record<string, unknown>
+): Promise<T> => {
   const response = await apiClient.post<ApiResponse<T>>(url, data, { params });
   return response.data.data as T;
 };
