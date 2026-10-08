@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { testSuitesApi, testCasesApi, projectsApi } from '../../api';
+import { testSuitesApi, testCasesApi } from '../../api';
+import { useProjectFilter } from '../../hooks/useProjectFilter';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
@@ -25,9 +26,8 @@ export default function TestSuitesPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
-  const [searchParams] = useSearchParams();
+  const { selectedProjectId, selectProject, projects, projectsLoading } = useProjectFilter();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('projectId') ?? '');
   const [newSuite, setNewSuite] = useState({ name: '', description: '', projectId: '' });
   const [selectedSuiteId, setSelectedSuiteId] = useState<string | null>(null);
   const [testCaseToAdd, setTestCaseToAdd] = useState('');
@@ -40,11 +40,6 @@ export default function TestSuitesPage() {
         ...(selectedProjectId ? { projectId: selectedProjectId } : {}),
       }),
     enabled: !!selectedProjectId,
-  });
-
-  const { data: projectList, isLoading: projectsLoading } = useQuery({
-    queryKey: ['projects', 'select'],
-    queryFn: () => projectsApi.list({ pageSize: 100 }),
   });
 
   const { data: selectedSuite, isLoading: selectedSuiteLoading } = useQuery({
@@ -125,6 +120,13 @@ export default function TestSuitesPage() {
     createSuiteMutation.mutate(newSuite);
   };
 
+  // Default the modal to the project already in context so the common case is a
+  // single click, not a second project selection.
+  const openCreateModal = () => {
+    setNewSuite((current) => ({ ...current, projectId: current.projectId || selectedProjectId }));
+    setShowCreateModal(true);
+  };
+
   const suites = suiteList?.items ?? [];
 
   return (
@@ -141,7 +143,7 @@ export default function TestSuitesPage() {
             <p className="text-muted-foreground">Group test cases and run them together</p>
           </div>
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={openCreateModal}
             className="flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors font-medium"
           >
             <Plus className="w-5 h-5" />
@@ -154,12 +156,12 @@ export default function TestSuitesPage() {
           <label className="block text-sm font-medium mb-2">Filter by Project</label>
           <Select
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
+            onChange={(e) => selectProject(e.target.value)}
             disabled={projectsLoading}
             className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
           >
             <option value="">Select a project</option>
-            {(projectList?.items ?? []).map((project) => (
+            {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
               </option>
@@ -171,7 +173,7 @@ export default function TestSuitesPage() {
           <div className="glass rounded-xl p-8 text-center">
             <p className="text-muted-foreground mb-4">Select a project to view its test suites.</p>
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={openCreateModal}
               className="inline-flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors font-medium"
             >
               <Plus className="w-5 h-5" />
@@ -205,7 +207,7 @@ export default function TestSuitesPage() {
             description="Create your first test suite to group test cases and run them together."
             action={
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={openCreateModal}
                 className="inline-flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors font-medium"
               >
                 <Plus className="w-5 h-5" />
@@ -442,7 +444,7 @@ export default function TestSuitesPage() {
                   disabled={createSuiteMutation.isPending}
                 >
                   <option value="">Select a project</option>
-                  {(projectList?.items ?? []).map((project) => (
+                  {projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.name}
                     </option>

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { testRunsApi, projectsApi, testCasesApi } from '../../api';
+import { testRunsApi, testCasesApi } from '../../api';
+import { useProjectFilter } from '../../hooks/useProjectFilter';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
@@ -32,10 +33,9 @@ type StatusFilter = (typeof STATUS_FILTERS)[number];
 
 export default function TestRunsPage() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const confirm = useConfirm();
-  const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('projectId') ?? '');
+  const { selectedProjectId, selectProject, projects } = useProjectFilter();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [formProjectId, setFormProjectId] = useState('');
@@ -52,11 +52,6 @@ export default function TestRunsPage() {
       }),
     // Runs execute in the background; keep the list current until they settle.
     refetchInterval: (q) => pollWhileActive(() => hasActiveItems(q.state.data?.items)),
-  });
-
-  const { data: projectList } = useQuery({
-    queryKey: ['projects', 'select'],
-    queryFn: () => projectsApi.list({ pageSize: 100 }),
   });
 
   const { data: projectTestCases, isFetching: projectTestCasesLoading } = useQuery({
@@ -97,6 +92,12 @@ export default function TestRunsPage() {
     setSelectedTestCaseIds([]);
   };
 
+  // Default the run modal to the project already in context.
+  const openCreateModal = () => {
+    setFormProjectId((current) => current || selectedProjectId);
+    setShowCreateModal(true);
+  };
+
   const toggleTestCase = (id: string) => {
     if (testCaseError) setTestCaseError(null);
     setSelectedTestCaseIds((prev) =>
@@ -135,7 +136,7 @@ export default function TestRunsPage() {
             <p className="text-muted-foreground">Execute and monitor your test suites</p>
           </div>
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={openCreateModal}
             className="flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors font-medium"
           >
             <Plus className="w-5 h-5" />
@@ -148,11 +149,11 @@ export default function TestRunsPage() {
           <label className="block text-sm font-medium mb-2">Filter by Project</label>
           <Select
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
+            onChange={(e) => selectProject(e.target.value)}
             className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
           >
             <option value="">All Projects</option>
-            {(projectList?.items ?? []).map((project) => (
+            {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
               </option>
@@ -229,7 +230,7 @@ export default function TestRunsPage() {
             action={
               statusFilter === 'ALL' ? (
                 <button
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={openCreateModal}
                   className="inline-flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors font-medium"
                 >
                   <Plus className="w-5 h-5" />
@@ -336,7 +337,7 @@ export default function TestRunsPage() {
                   disabled={createRunMutation.isPending}
                 >
                   <option value="">Select a project</option>
-                  {(projectList?.items ?? []).map((project) => (
+                  {projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.name}
                     </option>

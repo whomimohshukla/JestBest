@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { testCasesApi, projectsApi, applicationsApi } from '../../api';
+import { testCasesApi, applicationsApi } from '../../api';
+import { useProjectFilter } from '../../hooks/useProjectFilter';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
 import {
@@ -68,10 +68,9 @@ const TYPE_COLORS: Record<string, string> = {
 export default function TestCasesPage() {
   const queryClient = useQueryClient();
   const confirm = useConfirm();
-  const [searchParams] = useSearchParams();
+  const { selectedProjectId, selectProject, projects } = useProjectFilter();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState(searchParams.get('projectId') ?? '');
   const [newTestCase, setNewTestCase] = useState({
     title: '',
     description: '',
@@ -95,11 +94,6 @@ export default function TestCasesPage() {
         pageSize: 100,
         ...(selectedProjectId ? { projectId: selectedProjectId } : {}),
       }),
-  });
-
-  const { data: projectList } = useQuery({
-    queryKey: ['projects', 'select'],
-    queryFn: () => projectsApi.list({ pageSize: 100 }),
   });
 
   // Keyed to the page-level project filter, not newTestCase.projectId: the
@@ -205,6 +199,17 @@ export default function TestCasesPage() {
     });
   };
 
+  // Default both modals to the project already in context.
+  const openCreateModal = () => {
+    setNewTestCase((current) => ({ ...current, projectId: current.projectId || selectedProjectId }));
+    setShowCreateModal(true);
+  };
+
+  const openGenerateModal = () => {
+    setGenerateForm((current) => ({ ...current, projectId: current.projectId || selectedProjectId }));
+    setShowGenerateModal(true);
+  };
+
   const testCases = testCaseList?.items ?? [];
 
   return (
@@ -222,14 +227,14 @@ export default function TestCasesPage() {
           </div>
           <div className="flex gap-3">
             <button
-              onClick={() => setShowGenerateModal(true)}
+              onClick={openGenerateModal}
               className="flex items-center gap-2 px-4 py-3 bg-secondary hover:bg-secondary/80 rounded-lg transition-colors font-medium"
             >
               <Sparkles className="w-5 h-5" />
               Generate with AI
             </button>
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={openCreateModal}
               className="flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors font-medium"
             >
               <Plus className="w-5 h-5" />
@@ -243,11 +248,11 @@ export default function TestCasesPage() {
           <label className="block text-sm font-medium mb-2">Filter by Project</label>
           <Select
             value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
+            onChange={(e) => selectProject(e.target.value)}
             className="w-full px-4 py-3 bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500"
           >
             <option value="">All Projects</option>
-            {(projectList?.items ?? []).map((project) => (
+            {projects.map((project) => (
               <option key={project.id} value={project.id}>
                 {project.name}
               </option>
@@ -306,7 +311,7 @@ export default function TestCasesPage() {
             }
             action={
               <button
-                onClick={() => setShowCreateModal(true)}
+                onClick={openCreateModal}
                 className="inline-flex items-center gap-2 px-4 py-3 bg-red-600 hover:bg-red-600/90 text-white rounded-lg transition-colors font-medium"
               >
                 <Plus className="w-5 h-5" />
@@ -452,7 +457,7 @@ export default function TestCasesPage() {
                   disabled={generateTestCaseMutation.isPending}
                 >
                   <option value="">Select a project</option>
-                  {(projectList?.items ?? []).map((project) => (
+                  {projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.name}
                     </option>
@@ -721,7 +726,7 @@ export default function TestCasesPage() {
                   disabled={createTestCaseMutation.isPending}
                 >
                   <option value="">Select a project</option>
-                  {(projectList?.items ?? []).map((project) => (
+                  {projects.map((project) => (
                     <option key={project.id} value={project.id}>
                       {project.name}
                     </option>
