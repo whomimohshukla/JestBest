@@ -1,0 +1,77 @@
+# AWS EC2 (free tier) + Vercel + Neon deployment.
+#
+# This file is a compose override that runs ONLY the API, a local Redis and
+# Caddy (automatic HTTPS) on a single t3.micro instance. Postgres lives on Neon
+# and the SPA lives on Vercel, so nothing here needs a persistent database.
+#
+# Usage on the instance:
+#   cp .env.example .env   # then fill in the values
+#   docker compose up -d --build
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # appendonly keeps refresh tokens and OAuth state across restarts.
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [internal]
+
+  api:
+    image: jestbest-api:latest
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    env_file: [.env]
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+    expose: ['4000']
+    # Migrations run before boot so the running image matches the schema.
+    command: sh -c "npx prisma migrate deploy && node dist/server.js"
+    # /health (liveness) rather than /health/ready: Neon free tier cold-starts
+    # in ~1-2s and would make a readiness probe flap.
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:4000/api/v1/health >/dev/null || exit 1']
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    networks: [internal, edge]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [api]
+    ports:
+      - '80:80'
+      - '443:443'
+    environment:
+      # e.g. 203-0-113-10.sslip.io — resolves to the instance IP with no domain.
+      API_DOMAIN: ${API_DOMAIN:?set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    networks: [edge]
+
+networks:
+  # edge     = reachable from the internet via Caddy's published ports
+  # internal = reachable only between containers, no host port
+  edge:
+  internal:
+
+volumes:
+  redisdata:
+  caddydata:
+  caddyconfig:

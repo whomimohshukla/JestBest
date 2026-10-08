@@ -1,0 +1,21 @@
+# Caddy is the single public entry point. It obtains and renews a Let's
+# Encrypt certificate automatically for API_DOMAIN, so the API is reachable
+# over HTTPS (required: the Vercel SPA is HTTPS and blocks mixed content).
+{$API_DOMAIN} {
+	encode gzip
+
+	# The API prefix is part of the app, so pass every path straight through.
+	reverse_proxy api:4000 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Real-IP {remote_host}
+	}
+
+	# Do not log query strings: OAuth callbacks and tokens can appear there.
+	log {
+		output file /data/access.log {
+			roll_size 10MiB
+			roll_keep 3
+		}
+		format console
+	}
+}
