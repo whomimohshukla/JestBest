@@ -3,6 +3,7 @@ import {
   runTests,
   getTestRun,
   getTestRunResults,
+  getResultScreenshot,
   cancelTestRun,
   scheduleTestRun,
   listTestRuns,
@@ -44,6 +45,12 @@ router.get(
   requirePermission(Permissions.TEST_READ),
   validate(testRunParamsSchema, 'params'),
   getTestRunResults
+);
+router.get(
+  '/:testRunId/results/:resultId/screenshot',
+  requirePermission(Permissions.TEST_READ),
+  validate(testRunParamsSchema, 'params'),
+  getResultScreenshot
 );
 router.post(
   '/:testRunId/cancel',
