@@ -1,5 +1,6 @@
 import { llmService, type LlmMessage } from './llmService';
 import { knowledgeService } from './knowledgeService';
+import { logger } from '../../config/logger';
 import type { AgentContext, AgentResult } from './agentService';
 
 export interface FailureAnalyzerInput {
@@ -37,7 +38,7 @@ const buildPrompt = (
   }> = []
 ): LlmMessage[] => {
   const systemRead =
-    'You are an expert QA failure analysis agent. Analyze the test failure data and produce a precise root-cause analysis as JSON with keys: rootCause, category, confidence, evidence, suggestedFix, relatedSelectors.';
+    'You are an expert QA failure analysis agent. Analyze the test failure data and produce a precise root-cause analysis. Respond with a JSON object containing a single top-level key "analysis" whose value has the keys: rootCause, category, confidence, evidence, suggestedFix, relatedSelectors.';
   const systemRag =
     similar.length > 0
       ? [
@@ -63,7 +64,7 @@ export const fallbackAnalysis = (input: FailureAnalyzerInput): FailureAnalysis =
   return {
     rootCause: message.slice(0, 1000),
     category: 'unknown',
-    confidence: 10,
+    confidence: 0.1,
     evidence: input.consoleLog?.slice(0, 20) ?? [],
     suggestedFix: 'Review the failure evidence and fix the referenced element or flow.',
     relatedSelectors: [],
@@ -99,10 +100,46 @@ export const failureAnalyzerAgent = {
       };
     }
 
-    const response = await llmService.chatJson<FailureAnalyzerOutput>(messages);
-    const analysis = {
-      ...fallbackAnalysis(input),
-      ...response.data.analysis,
+    const response = await llmService
+      .chatJson<FailureAnalyzerOutput | FailureAnalysis>(messages)
+      .catch((error: unknown) => {
+        logger.warn({ err: error }, 'failure analyzer LLM call failed; using fallback analysis');
+        return null;
+      });
+
+    if (!response) {
+      return {
+        output: { analysis: fallbackAnalysis(input) },
+        usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0, costUsd: 0 },
+        messages,
+      };
+    }
+
+    const payload = response.data as FailureAnalyzerOutput | FailureAnalysis | null;
+    const aiAnalysis =
+      payload && typeof payload === 'object' && 'analysis' in payload && payload.analysis
+        ? (payload as FailureAnalyzerOutput).analysis
+        : payload && typeof payload === 'object'
+          ? (payload as FailureAnalysis)
+          : undefined;
+
+    const ai = (aiAnalysis ?? {}) as Record<string, unknown>;
+    const base = fallbackAnalysis(input);
+    const toList = (value: unknown): string[] =>
+      Array.isArray(value)
+        ? value.map((v) => String(v)).filter(Boolean)
+        : typeof value === 'string' && value.trim()
+          ? [value.trim()]
+          : [];
+    const rawConfidence = typeof ai.confidence === 'number' ? ai.confidence : base.confidence;
+    const evidence = toList(ai.evidence);
+    const analysis: FailureAnalysis = {
+      rootCause: typeof ai.rootCause === 'string' && ai.rootCause.trim() ? ai.rootCause : base.rootCause,
+      category: (typeof ai.category === 'string' ? ai.category : base.category) as FailureAnalysis['category'],
+      confidence: rawConfidence > 1 ? Math.min(rawConfidence / 100, 1) : Math.max(rawConfidence, 0),
+      evidence: evidence.length > 0 ? evidence : base.evidence,
+      suggestedFix: typeof ai.suggestedFix === 'string' && ai.suggestedFix.trim() ? ai.suggestedFix : base.suggestedFix,
+      relatedSelectors: toList(ai.relatedSelectors),
     };
 
     if (context.organizationId) {
