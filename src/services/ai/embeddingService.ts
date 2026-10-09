@@ -24,7 +24,7 @@ export interface ProviderHasEmbeddings {
 
 const EMBEDDING_MODEL_FALLBACK: Record<string, string> = {
   openai: 'text-embedding-ada-002',
-  gemini: 'text-embedding-004',
+  gemini: 'gemini-embedding-001',
   huggingface: 'sentence-transformers/all-MiniLM-L6-v2',
 };
 
@@ -52,6 +52,13 @@ export const embeddingService = {
 
     const startedAt = Date.now();
     const targetModel = model ?? EMBEDDING_MODEL_FALLBACK[info.provider];
+    const requestBody: Record<string, unknown> = {
+      model: targetModel,
+      input: text.slice(0, 24_000),
+    };
+    if (info.provider === 'gemini') {
+      requestBody.dimensions = EMBEDDING_DIMENSION;
+    }
     try {
       const response = await fetch(`${info.baseUrl}/embeddings`, {
         method: 'POST',
@@ -59,7 +66,7 @@ export const embeddingService = {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${info.apiKey}`,
         },
-        body: JSON.stringify({ model: targetModel, input: text.slice(0, 24_000) }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
