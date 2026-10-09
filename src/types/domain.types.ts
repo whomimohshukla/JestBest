@@ -14,10 +14,13 @@ export interface TestStep {
     | 'waitForTimeout'
     | 'expectVisible'
     | 'expectText'
+    | 'expectAttribute'
+    | 'expectStatus'
     | 'screenshot';
   selector?: string;
   value?: string;
   text?: string;
+  attribute?: string;
   timeout?: number;
 }
 

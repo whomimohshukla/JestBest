@@ -3,6 +3,10 @@ import type { TestStep } from '../../types/domain.types';
 
 const DEFAULT_TIMEOUT = 10000;
 
+// Playwright resolves `page.goto` for 4xx/5xx responses too, so the status of
+// the last document navigation is tracked here for `expectStatus` assertions.
+const lastNavigationStatus = new WeakMap<Page, number>();
+
 const resolveUrl = (value: string | undefined, baseUrl?: string): string => {
   if (!value) return '';
   if (!baseUrl) return value;
@@ -44,9 +48,16 @@ export const pageService = {
     const timeout = step.timeout ?? DEFAULT_TIMEOUT;
     try {
       switch (step.action) {
-        case 'goto':
-          await page.goto(resolveUrl(step.value, baseUrl), { waitUntil: 'domcontentloaded', timeout });
+        case 'goto': {
+          const response = await page.goto(resolveUrl(step.value, baseUrl), {
+            waitUntil: 'domcontentloaded',
+            timeout,
+          });
+          if (response) {
+            lastNavigationStatus.set(page, response.status());
+          }
           break;
+        }
         case 'click':
           await page.click(step.selector ?? '', { timeout });
           break;
@@ -69,6 +80,31 @@ export const pageService = {
           const body = await page.textContent('body');
           if (!body || !body.includes(step.text ?? '')) {
             throw new Error(`Expected text "${step.text}" not found on page`);
+          }
+          break;
+        }
+        case 'expectAttribute': {
+          const selector = step.selector ?? '';
+          const attribute = step.attribute ?? 'value';
+          const actual = await page.getAttribute(selector, attribute, { timeout });
+          if (actual === null) {
+            throw new Error(`Element "${selector}" has no attribute "${attribute}"`);
+          }
+          if (!actual.includes(step.text ?? '')) {
+            throw new Error(
+              `Expected attribute "${attribute}" of "${selector}" to include "${step.text}" but got "${actual}"`
+            );
+          }
+          break;
+        }
+        case 'expectStatus': {
+          const expected = Number(step.value);
+          const actual = lastNavigationStatus.get(page);
+          if (actual === undefined) {
+            throw new Error('No navigation status recorded; add a "goto" step before "expectStatus"');
+          }
+          if (actual !== expected) {
+            throw new Error(`Expected HTTP status ${expected} but got ${actual}`);
           }
           break;
         }

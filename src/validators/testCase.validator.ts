@@ -11,11 +11,14 @@ const testStepSchema = z.object({
     'waitForTimeout',
     'expectVisible',
     'expectText',
+    'expectAttribute',
+    'expectStatus',
     'screenshot',
   ]),
   selector: z.string().optional(),
   value: z.string().optional(),
   text: z.string().optional(),
+  attribute: z.string().optional(),
   timeout: z.coerce.number().optional(),
 });
 
