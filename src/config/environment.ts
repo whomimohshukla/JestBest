@@ -46,10 +46,13 @@ const envSchema = z.object({
   AWS_S3_ENDPOINT: z.string().optional(),
 
   AI_PROVIDER: z.enum(['openai', 'gemini', 'huggingface', 'mock']).default('mock'),
+  // Comma-separated providers to try (in order) when the primary provider's
+  // request fails. Empty = provider-aware defaults ending in the offline mock.
+  AI_FALLBACK_PROVIDERS: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_BASE_URL: z.string().default('https://api.openai.com/v1'),
   GEMINI_API_KEY: z.string().optional(),
-  GEMINI_MODEL: z.string().default('gemini-2.0-flash-lite'),
+  GEMINI_MODEL: z.string().default('gemini-3.5-flash-lite'),
   HUGGINGFACE_API_KEY: z.string().optional(),
   HUGGINGFACE_MODEL: z.string().default('meta-llama/Meta-Llama-3.1-8B-Instruct'),
   LLM_MODEL: z.string().default('gpt-4o-mini'),

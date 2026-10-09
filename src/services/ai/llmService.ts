@@ -1,4 +1,5 @@
 import { env } from '../../config/environment';
+import { logger } from '../../config/logger';
 import { UpstreamError } from '../../utils/errors';
 
 export interface LlmMessage {
@@ -68,8 +69,36 @@ const getProvider = (): AiProvider => {
   return 'mock';
 };
 
-export const getLlmConfig = (): LlmConfig | null => {
-  const provider = getProvider();
+export const getLlmConfig = (): LlmConfig | null => buildProviderConfig(getProvider());
+
+// Providers tried, in order, when the primary one fails at request time. This
+// keeps AI features working through an OpenAI/Gemini outage by degrading to a
+// Hugging Face open-source model and, as a last resort, the offline mock.
+const DEFAULT_FALLBACKS: Record<AiProvider, AiProvider[]> = {
+  gemini: ['huggingface', 'openai'],
+  openai: ['gemini', 'huggingface'],
+  huggingface: ['gemini', 'openai'],
+  mock: [],
+};
+
+export const getProviderChain = (): AiProvider[] => {
+  const primary = getProvider();
+  if (primary === 'mock') return ['mock'];
+
+  const configured = (env.AI_FALLBACK_PROVIDERS ?? '')
+    .split(',')
+    .map((p) => p.trim().toLowerCase())
+    .filter((p): p is AiProvider => (['openai', 'gemini', 'huggingface', 'mock'] as string[]).includes(p));
+
+  const fallbacks = configured.length > 0 ? configured : DEFAULT_FALLBACKS[primary];
+  const chain: AiProvider[] = [primary];
+  for (const provider of [...fallbacks, 'mock' as AiProvider]) {
+    if (!chain.includes(provider)) chain.push(provider);
+  }
+  return chain;
+};
+
+const buildProviderConfig = (provider: AiProvider): LlmConfig | null => {
   if (provider === 'mock') {
     return {
       provider,
@@ -263,6 +292,30 @@ const safeJsonParse = (input: string): unknown => {
   }
 };
 
+const callProvider = async (
+  config: LlmConfig,
+  messages: LlmMessage[],
+  options: LlmOptions
+): Promise<LlmResponse> => {
+  const startedAt = Date.now();
+  const response = await fetch(`${config.baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${config.apiKey}`,
+    },
+    body: buildRequestBody(config, messages, options),
+  });
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new UpstreamError(`LLM request failed with status ${response.status}`, body.slice(0, 500));
+  }
+
+  const data = (await response.json()) as OpenAiChatResponse;
+  return parseOpenAiResponse(data, startedAt, config, options);
+};
+
 export const llmService = {
   isConfigured(): boolean {
     return getProvider() === 'mock' || getLlmConfig() !== null;
@@ -272,40 +325,38 @@ export const llmService = {
     return getAiProviderName();
   },
 
+  getProviderChain(): AiProvider[] {
+    return getProviderChain();
+  },
+
   async chat(messages: LlmMessage[], options: LlmOptions = {}): Promise<LlmResponse> {
-    const config = getLlmConfig();
-    if (!config) {
-      throw new UpstreamError(
-        `LLM provider "${getAiProviderName()}" is not configured. Set ${envOutKey()} in your environment or switch AI_PROVIDER.`
-      );
-    }
+    const chain = getProviderChain();
+    let lastError: unknown;
 
-    if (config.provider === 'mock') {
-      return mockChat(messages, options, config);
-    }
+    for (const provider of chain) {
+      const config = buildProviderConfig(provider);
+      if (!config) continue;
 
-    const startedAt = Date.now();
-    try {
-      const response = await fetch(`${config.baseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: buildRequestBody(config, messages, options),
-      });
-
-      if (!response.ok) {
-        const body = await response.text().catch(() => '');
-        throw new UpstreamError(`LLM request failed with status ${response.status}`, body.slice(0, 500));
+      if (config.provider === 'mock') {
+        return mockChat(messages, options, config);
       }
 
-      const data = (await response.json()) as OpenAiChatResponse;
-      return parseOpenAiResponse(data, startedAt, config, options);
-    } catch (error) {
-      if (error instanceof UpstreamError) throw error;
-      throw new UpstreamError('LLM request failed', (error as Error).message);
+      try {
+        return await callProvider(config, messages, options);
+      } catch (error) {
+        lastError = error;
+        logger.warn(
+          { provider, err: error instanceof Error ? error.message : error },
+          'LLM provider failed; falling back to next provider'
+        );
+      }
     }
+
+    if (lastError instanceof UpstreamError) throw lastError;
+    throw new UpstreamError(
+      `LLM provider "${getAiProviderName()}" is not configured. Set ${envOutKey()} in your environment or switch AI_PROVIDER.`,
+      lastError instanceof Error ? lastError.message : undefined
+    );
   },
 
   async chatJson<T>(messages: LlmMessage[], options: LlmOptions = {}): Promise<{ data: T; usage: LlmUsage }> {
