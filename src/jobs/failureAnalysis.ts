@@ -16,30 +16,43 @@ export const processFailureAnalysisJob = async (job: Job<AiJobData>): Promise<vo
     organizationId: string;
     testRunId: string;
     projectId?: string;
+    failingResults?: Array<{ testResultId: string; testCaseId: string; testCaseTitle: string }>;
   };
-  const result = await testResultRepository.findById(data.testResultId);
-  if (!result) {
-    logger.warn({ testResultId: data.testResultId }, 'no test result found for failure analysis');
-    return;
-  }
 
-  const response = await failureAnalyzerAgent.execute(
-    {
-      organizationId: data.organizationId,
-      testRunId: data.testRunId,
-      testResultId: data.testResultId,
-    },
-    {
-      errorMessage: result.errorMessage ?? undefined,
-      consoleLog: result.consoleLog ?? undefined,
-      domSnapshot: result.domSnapshot,
-      testTitle: result.testCase?.title,
+  // A run can fail more than one case. `testExecutionService` forwards the full
+  // list, so analyze every failing result instead of only the first one.
+  const failingResults =
+    data.failingResults && data.failingResults.length > 0
+      ? data.failingResults
+      : [{ testResultId: data.testResultId, testCaseId: '', testCaseTitle: '' }];
+
+  for (const failing of failingResults) {
+    const result = await testResultRepository.findById(failing.testResultId);
+    if (!result) {
+      logger.warn({ testResultId: failing.testResultId }, 'no test result found for failure analysis');
+      continue;
     }
-  );
 
-  await testResultRepository.update(data.testResultId, {
-    failureAnalysis: response.output.analysis as unknown as Prisma.InputJsonValue,
-  });
+    const response = await failureAnalyzerAgent.execute(
+      {
+        organizationId: data.organizationId,
+        testRunId: data.testRunId,
+        testResultId: failing.testResultId,
+      },
+      {
+        errorMessage: result.errorMessage ?? undefined,
+        consoleLog: result.consoleLog ?? undefined,
+        domSnapshot: result.domSnapshot,
+        testTitle: failing.testCaseTitle || result.testCase?.title,
+      }
+    );
+
+    await testResultRepository.update(failing.testResultId, {
+      failureAnalysis: response.output.analysis as unknown as Prisma.InputJsonValue,
+    });
+
+    logger.info({ testResultId: failing.testResultId }, 'failure analysis stored');
+  }
 
   if (data.projectId) {
     await bugDetectionService.detect({
@@ -47,8 +60,7 @@ export const processFailureAnalysisJob = async (job: Job<AiJobData>): Promise<vo
       testRunId: data.testRunId,
       testResultId: data.testResultId,
       organizationId: data.organizationId,
+      failingResults,
     });
   }
-
-  logger.info({ testResultId: data.testResultId }, 'failure analysis stored');
 };
