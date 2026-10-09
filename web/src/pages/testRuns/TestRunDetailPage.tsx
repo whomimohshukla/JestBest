@@ -1,3 +1,4 @@
+import { Fragment, useState } from 'react';
 import { formatDuration } from '../../lib/format';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -5,12 +6,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { testRunsApi } from '../../api';
 import { getErrorMessage } from '../../api/client';
 import Layout from '../../components/Layout';
+import ResultEvidencePanel from '../../components/ResultEvidencePanel';
 import {
   RefreshCw,
   Ban,
   ArrowLeft,
   ListChecks,
   ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
@@ -39,6 +42,7 @@ const RESULT_STATUS_COLORS: Record<string, string> = {
 export default function TestRunDetailPage() {
   const { runId } = useParams<{ runId: string }>();
   const queryClient = useQueryClient();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { data: run, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['test-run', runId],
@@ -160,6 +164,7 @@ export default function TestRunDetailPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-8" />
                       <TableHead>Test Case</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Duration</TableHead>
@@ -167,36 +172,52 @@ export default function TestRunDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {testResults.map((result) => (
-                      <TableRow key={result.id}>
-                        <TableCell className="font-medium">
-                          {result.testCase?.title ?? result.testCaseId}
-                        </TableCell>
-                        <TableCell>
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${RESULT_STATUS_COLORS[result.status] ?? 'text-muted-foreground bg-secondary border-border'}`}>
-                            {result.status}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDuration(result.duration)}
-                        </TableCell>
-                        <TableCell className="max-w-md">
-                          {result.errorMessage ? (
-                            <details className="group">
-                              <summary className="flex items-center gap-1.5 text-xs text-red-400 cursor-pointer list-none">
-                                <ChevronDown className="w-3.5 h-3.5 transition-transform group-open:rotate-180" />
-                                <span className="line-clamp-1">{result.errorMessage}</span>
-                              </summary>
-                              <p className="mt-2 text-xs text-muted-foreground bg-secondary/40 rounded-lg p-3 whitespace-pre-wrap break-words">
-                                {result.errorMessage}
-                              </p>
-                            </details>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
+                    {testResults.map((result) => {
+                      const isExpanded = expandedId === result.id;
+                      return (
+                        <Fragment key={result.id}>
+                          <TableRow
+                            className="cursor-pointer hover:bg-secondary/30"
+                            onClick={() => setExpandedId(isExpanded ? null : result.id)}
+                          >
+                            <TableCell className="w-8 text-muted-foreground">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {result.testCase?.title ?? result.testCaseId}
+                            </TableCell>
+                            <TableCell>
+                              <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${RESULT_STATUS_COLORS[result.status] ?? 'text-muted-foreground bg-secondary border-border'}`}>
+                                {result.status}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-sm text-muted-foreground">
+                              {formatDuration(result.duration)}
+                            </TableCell>
+                            <TableCell className="max-w-md">
+                              {result.errorMessage ? (
+                                <span className="flex items-center gap-1.5 text-xs text-red-400">
+                                  <span className="line-clamp-1">{result.errorMessage}</span>
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && (
+                            <TableRow>
+                              <TableCell colSpan={5} className="bg-secondary/10 p-3">
+                                <ResultEvidencePanel runId={runId as string} result={result} />
+                              </TableCell>
+                            </TableRow>
                           )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                        </Fragment>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

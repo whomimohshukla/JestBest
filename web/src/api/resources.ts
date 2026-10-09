@@ -116,6 +116,8 @@ export const testRunsApi = {
   cancel: (id: string) => apiPost<TestRun>(`/test-runs/${id}/cancel`),
   results: (id: string, params?: Record<string, unknown>) =>
     apiPaginated<TestResult>(`/test-runs/${id}/results`, params),
+  resultScreenshot: (runId: string, resultId: string) =>
+    apiGet<{ dataUrl: string | null }>(`/test-runs/${runId}/results/${resultId}/screenshot`),
 };
 
 export const bugsApi = {

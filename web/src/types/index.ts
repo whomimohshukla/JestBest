@@ -198,6 +198,21 @@ export interface TestRun {
   createdAt: string;
 }
 
+export interface TestFailureAnalysis {
+  category?: string;
+  evidence?: string[];
+  rootCause?: string;
+  confidence?: number;
+  suggestedFix?: string;
+  relatedSelectors?: string[];
+}
+
+export interface TestDomSnapshot {
+  title?: string;
+  locationUrl?: string;
+  text?: string;
+}
+
 export interface TestResult {
   id: string;
   testRunId: string;
@@ -205,9 +220,12 @@ export interface TestResult {
   status: TestStatus;
   duration: number | null;
   errorMessage: string | null;
+  stackTrace?: string | null;
   screenshotUrl: string | null;
   videoUrl: string | null;
-  consoleLogs: string[];
+  consoleLog: string[];
+  domSnapshot: TestDomSnapshot | null;
+  failureAnalysis: TestFailureAnalysis | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
